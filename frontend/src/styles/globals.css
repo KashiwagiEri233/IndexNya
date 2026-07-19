@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-claude-bg text-claude-ink font-sans antialiased;
+  }
+  * {
+    @apply border-claude-border;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-claude-accent text-white hover:bg-claude-accentHover;
+  }
+  .btn-ghost {
+    @apply btn text-claude-ink hover:bg-claude-panel;
+  }
+  .card {
+    @apply rounded-xl border bg-white shadow-soft;
+  }
+  .input {
+    @apply w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-claude-accent/30;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-claude-panel px-2.5 py-0.5 text-xs text-claude-muted;
+  }
+}
+
+/* markdown 渲染样式 */
+.prose-claude {
+  @apply text-[15px] leading-7 text-claude-ink;
+}
+.prose-claude h1,
+.prose-claude h2,
+.prose-claude h3 {
+  @apply font-semibold mt-5 mb-2;
+}
+.prose-claude h1 { @apply text-xl; }
+.prose-claude h2 { @apply text-lg; }
+.prose-claude h3 { @apply text-base; }
+.prose-claude p { @apply my-2; }
+.prose-claude ul {
+  @apply list-disc pl-6 my-2;
+}
+.prose-claude ol {
+  @apply list-decimal pl-6 my-2;
+}
+.prose-claude li { @apply my-1; }
+.prose-claude code {
+  @apply rounded bg-claude-panel px-1.5 py-0.5 text-[13px] font-mono;
+}
+.prose-claude pre {
+  @apply rounded-lg bg-[#1f1e1d] text-[#faf9f5] p-4 my-3 overflow-x-auto text-[13px];
+}
+.prose-claude pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+.prose-claude blockquote {
+  @apply border-l-4 border-claude-accent pl-3 italic text-claude-muted my-2;
+}
+.prose-claude table {
+  @apply w-full border-collapse my-3 text-sm;
+}
+.prose-claude th,
+.prose-claude td {
+  @apply border px-2 py-1 text-left;
+}
+.prose-claude a {
+  @apply text-claude-accent underline;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}

@@ -1,0 +1,15 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.db
+*.db-journal
+backend/uploads/
+backend/outputs/
+node_modules/
+dist/
+.DS_Store
+*.log
+.vscode/
+.idea/
