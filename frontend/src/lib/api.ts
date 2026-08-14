@@ -282,6 +282,9 @@ export const api = {
       onProfile?: (d: any) => void;
       onResource?: (d: any) => void;
       onTerms?: (d: any) => void;
+      onPlan?: (d: any) => void;
+      onProgress?: (d: any) => void;
+      onAcceptance?: (d: any) => void;
       onDone?: (d: any) => void;
       onError?: (m: string) => void;
     },
@@ -338,6 +341,15 @@ export const api = {
             break;
           case "terms":
             handlers.onTerms?.(parsed);
+            break;
+          case "plan":
+            handlers.onPlan?.(parsed);
+            break;
+          case "progress":
+            handlers.onProgress?.(parsed);
+            break;
+          case "acceptance":
+            handlers.onAcceptance?.(parsed);
             break;
           case "done":
             handlers.onDone?.(parsed);

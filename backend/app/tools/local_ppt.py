@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import Any
 
 from pptx import Presentation
@@ -105,27 +106,71 @@ def _build_outline(topic: str, context: list[str]) -> list[tuple[str, list[str],
     ]
 
 
+def _history_blocks(extra: str) -> list[tuple[str, str]]:
+    history = extra.split("对话历史：", 1)[-1] if "对话历史：" in extra else ""
+    history = history.split("额外要求：", 1)[0]
+    blocks: list[tuple[str, str]] = []
+    current_role = ""
+    current_lines: list[str] = []
+    for raw in history.splitlines():
+        line = raw.strip()
+        match = re.match(r"^(user|assistant|用户|助手):\s*(.*)$", line)
+        if match:
+            if current_lines:
+                blocks.append((current_role, " ".join(current_lines).strip()))
+            current_role = match.group(1)
+            current_lines = [match.group(2)] if match.group(2) else []
+        elif line:
+            current_lines.append(line)
+    if current_lines:
+        blocks.append((current_role, " ".join(current_lines).strip()))
+    return blocks
+
+
+def _infer_topic(topic: str, extra: str) -> str:
+    clean = re.sub(r"[\s，。:：]+", " ", (topic or "").strip())
+    # “生成一份 PPT”这类指令本身不是知识主题，优先取上文用户问题或回答标题。
+    if not clean or re.fullmatch(r"(?:生成|制作|做个|做一份|创建|导出)?\s*(?:一份)?\s*(?:ppt|PPT|幻灯片|演示文稿|课件)", clean, re.I):
+        blocks = _history_blocks(extra)
+        for role, text in reversed(blocks):
+            if role in {"assistant", "助手"}:
+                heading = re.search(r"(?:^|\s)#\s*([^#\n]{2,60})", text)
+                if heading:
+                    return heading.group(1).strip()
+            if role in {"user", "用户"} and text:
+                return text[:60]
+    return clean[:80] or "学习主题"
+
+
 def _context_items(profile: dict | None, extra: str) -> list[str]:
     items: list[str] = []
     for key, label in (("major", "专业方向"), ("learning_goals", "学习目标"), ("knowledge_base", "基础情况"), ("common_mistakes", "常见难点")):
         value = (profile or {}).get(key)
         if value:
             items.append(f"{label}：{str(value)[:100]}")
-    history = extra.split("对话历史：", 1)[-1] if "对话历史：" in extra else ""
-    history = history.split("额外要求：", 1)[0]
-    for line in history.splitlines():
-        line = line.strip()
-        if line.startswith("user:") or line.startswith("用户:"):
-            text = line.split(":", 1)[-1].strip()
-            if text and text not in items:
-                items.append(f"对话中提出的问题：{text[:120]}")
-    return items[:4]
+
+    for role, text in _history_blocks(extra):
+        if not text:
+            continue
+        if role in {"user", "用户"}:
+            items.append(f"上文问题：{text[:140]}")
+            continue
+        # 从上文回答中提取标题和要点，而不是只取“生成 PPT”这条指令。
+        headings = re.findall(r"(?:^|\s)(?:#{1,3}\s*|\d+[、.．]\s*)([^#\n]{2,70})", text)
+        bullets = re.findall(r"(?:^|\s)[-•*]\s*([^\n]{4,120})", text)
+        for item in headings + bullets:
+            item = re.sub(r"[*_`]+", "", item).strip(" ：:;；")
+            if item and item not in items:
+                items.append(f"知识要点：{item}")
+        if not headings and not bullets:
+            items.append(f"上文讲解：{text[:140]}")
+    return items[:8]
 
 
 def generate_local_ppt(topic: str, *, profile: dict | None = None, extra: str = "") -> dict[str, Any]:
     """使用固定教学模板生成本地 .pptx 文件，并带入当前画像和对话上下文。"""
-    topic = (topic or "学习主题").strip()[:80]
     context = _context_items(profile, extra)
+    topic = _infer_topic(topic, extra)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     prs = Presentation()
     prs.slide_width = Inches(13.333)

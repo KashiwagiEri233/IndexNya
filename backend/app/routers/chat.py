@@ -20,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..agents.base import BaseAgent
+from ..agents.main_agent import MainAgent
 from ..llm.factory import chat_complete, get_llm, json_complete, reset_active_model, set_active_model
 from ..db import get_db
 from ..models import Conversation, Message, Resource, Student
@@ -213,20 +214,40 @@ async def _stream_chat_impl(
             route = {"action": "tutor", "topic": payload.message, "video_topic": payload.message}
         else:
             route = {"action": "resource", "resource_type": explicit, "topic": payload.message}
+        main_plan = {"action": route["action"], "resource_type": route.get("resource_type"), "topic": route.get("topic"), "tasks": [{"agent": route.get("resource_type") or route["action"], "instruction": "完成当前请求"}], "acceptance": ["结果与用户请求相关", "结果可以直接展示给用户"]}
     elif _is_local_ppt_request(payload.message):
         # PPT 使用本地模板生成，不需要模型路由。
         route = {"action": "resource", "resource_type": "ppt", "topic": payload.message}
+        main_plan = {"action": "resource", "resource_type": "ppt", "topic": payload.message, "tasks": [{"agent": "ppt", "instruction": "读取上文学习内容并生成本地 PPT"}], "acceptance": ["PPT 包含上文知识点", "文件可以下载"]}
     elif _is_local_illustration_request(payload.message):
         # 插图提示词使用本地模板，不需要文本模型路由。
         route = {"action": "resource", "resource_type": "illustration", "topic": payload.message}
+        main_plan = {"action": "resource", "resource_type": "illustration", "topic": payload.message, "tasks": [{"agent": "illustration", "instruction": "根据主题生成教学插图"}], "acceptance": ["图片文件生成成功"]}
     else:
         try:
-            from ..agents.router import RouterAgent
-            router = RouterAgent()
-            route = await router.route(payload.message, profile, history)
+            main_plan = await MainAgent().plan(payload.message, profile, history)
+            route = {
+                "action": main_plan.get("action", "chat"),
+                "resource_type": main_plan.get("resource_type"),
+                "topic": main_plan.get("topic") or payload.message,
+                "video_topic": main_plan.get("video_topic"),
+            }
         except Exception as e:
-            logger.warning("intent routing error: %s, fallback to chat", e)
-            route = {"action": "chat", "topic": ""}
+            logger.warning("main agent planning error: %s, fallback to chat", e)
+            route = {"action": "chat", "topic": payload.message}
+            main_plan = {"action": "chat", "topic": payload.message, "tasks": [{"agent": "conversation", "instruction": "回答当前学习问题"}], "acceptance": ["回答与问题相关且内容非空"]}
+
+    yield _sse("plan", {
+        "agent": "main",
+        "tasks": main_plan.get("tasks", []),
+        "acceptance": main_plan.get("acceptance", []),
+    })
+    yield _sse("progress", {
+        "phase": "planning",
+        "agent": "main",
+        "status": "completed",
+        "detail": "主 Agent 已完成任务规划，准备派发 subagent。",
+    })
 
     # 通知前端路由决策
     yield _sse("route", {
@@ -240,6 +261,7 @@ async def _stream_chat_impl(
     full_text_parts: list[str] = []
 
     if action == "resource":
+        yield _sse("progress", {"phase": "subagent", "agent": route.get("resource_type") or "resource", "status": "running", "detail": "subagent 正在执行专门任务。"})
         # 调资源生成智能体（非流式，生成后一次性返回 + 触发资源刷新）
         rtype = route.get("resource_type", "lecture")
         topic = route.get("topic") or payload.message
@@ -254,12 +276,14 @@ async def _stream_chat_impl(
             full_text_parts.append(preview)
             yield _sse("token", {"text": preview})
             yield _sse("resource", {"id": r.id, "type": r.type, "title": r.title, "file_url": r.file_url})
+            yield _sse("progress", {"phase": "subagent", "agent": rtype, "status": "completed", "detail": "subagent 已返回结果，主 Agent 即将验收。"})
         except Exception as e:
             logger.exception("resource generation in chat failed")
             err = f"⚠️ 资源生成失败：{e}"
             full_text_parts.append(err)
             yield _sse("token", {"text": err})
     elif action == "tutor":
+        yield _sse("progress", {"phase": "subagent", "agent": "tutor", "status": "running", "detail": "辅导 subagent 正在整理回答。"})
         # 调辅导智能体
         topic = route.get("topic") or payload.message
         try:
@@ -279,12 +303,14 @@ async def _stream_chat_impl(
                 )
                 full_text_parts.append(link)
                 yield _sse("token", {"text": link})
+            yield _sse("progress", {"phase": "subagent", "agent": "tutor", "status": "completed", "detail": "辅导 subagent 已完成，主 Agent 即将验收。"})
         except Exception as e:
             logger.exception("tutor in chat failed")
             err = f"⚠️ 辅导失败：{e}"
             full_text_parts.append(err)
             yield _sse("token", {"text": err})
     else:
+        yield _sse("progress", {"phase": "subagent", "agent": "conversation", "status": "running", "detail": "对话 subagent 正在生成回答。"})
         # chat：默认对话流式（画像构建 + 通用回答）
         agent = BaseAgent()
         extra_context_parts: list[str] = []
@@ -303,6 +329,7 @@ async def _stream_chat_impl(
             ):
                 full_text_parts.append(chunk)
                 yield _sse("token", {"text": chunk})
+            yield _sse("progress", {"phase": "subagent", "agent": "conversation", "status": "completed", "detail": "对话 subagent 已完成，主 Agent 即将验收。"})
         except Exception as e:
             logger.exception("chat stream failed")
             yield _sse("error", {"message": str(e)})
@@ -313,7 +340,20 @@ async def _stream_chat_impl(
     if "[[PROFILE_READY]]" in full_text:
         full_text = full_text.replace("[[PROFILE_READY]]", "").strip()
 
-    # 6. 提取回答中的专有名词，供前端渲染为可点击子对话入口。
+    # 6. 主 Agent 验收 subagent 结果。
+    if payload.model:
+        acceptance = await MainAgent().accept(main_plan, full_text)
+    else:
+        acceptance = {"accepted": bool(full_text.strip()), "reason": "本地任务结果非空，已通过基础验收"}
+    yield _sse("acceptance", {"agent": "main", **acceptance})
+    yield _sse("progress", {
+        "phase": "acceptance",
+        "agent": "main",
+        "status": "completed" if acceptance.get("accepted") else "failed",
+        "detail": acceptance.get("reason", "主 Agent 验收完成"),
+    })
+
+    # 7. 提取回答中的专有名词，供前端渲染为可点击子对话入口。
     terms: list[dict[str, str]] = []
     if action in {"chat", "tutor"}:
         terms = await _extract_terms(full_text)
@@ -351,6 +391,8 @@ async def _stream_chat_impl(
             "action": action,
             "terms": terms,
             "model_id": payload.model.id if payload.model else None,
+            "main_plan": {"tasks": main_plan.get("tasks", []), "acceptance": main_plan.get("acceptance", [])},
+            "acceptance": acceptance,
         },
     )
     db.add(asst_msg)

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { GitBranch, Loader2, Send, X } from "lucide-react";
+import { GitBranch, GripVertical, Loader2, Send, X } from "lucide-react";
 import { Markdown } from "@/components/chat/Markdown";
 import { api, type ChatModel, type ChatTerm } from "@/lib/api";
+import { useAppStore } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
 interface TermMessage {
@@ -44,7 +45,10 @@ export function TermConversationPopover({
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const explanationStarted = useRef(false);
+  const bumpConversations = useAppStore((state) => state.bumpConversations);
   const [nestedTerm, setNestedTerm] = useState<{ term: ChatTerm; context: string; branchId?: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -56,12 +60,31 @@ export function TermConversationPopover({
     void generateExplanation();
   }, [conversationId, model?.id]);
 
+  function startDrag(event: React.PointerEvent<HTMLElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    dragRef.current = { startX: event.clientX, startY: event.clientY, originX: dragOffset.x, originY: dragOffset.y };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveDrag(event: React.PointerEvent<HTMLElement>) {
+    if (!dragRef.current) return;
+    setDragOffset({
+      x: dragRef.current.originX + event.clientX - dragRef.current.startX,
+      y: dragRef.current.originY + event.clientY - dragRef.current.startY,
+    });
+  }
+
+  function endDrag() {
+    dragRef.current = null;
+  }
+
   async function openNestedTerm(nextTerm: ChatTerm, nextContext: string) {
     if (nestedTerm) return;
     setNestedTerm({ term: nextTerm, context: nextContext });
     try {
       const branch = await api.branchConversation(conversationId, `围绕「${nextTerm.text}」的讨论`);
       setNestedTerm({ term: nextTerm, context: nextContext, branchId: branch.id });
+      bumpConversations();
     } catch (error: any) {
       setNestedTerm(null);
       alert(`打开子对话失败：${error.message}`);
@@ -91,6 +114,7 @@ export function TermConversationPopover({
           context: `当前专有名词：${term.text}\n已有简要解释：${term.explanation || "请结合上下文解释。"}\n相关回答：${context.slice(0, 4000)}`,
         },
         {
+          onMeta: () => bumpConversations(),
           onToken: (token) => updateAssistant(assistantIndex, (message) => ({ ...message, content: message.content + token })),
           onTerms: (data) => updateAssistant(assistantIndex, (message) => ({ ...message, terms: Array.isArray(data.terms) ? data.terms : [] })),
           onDone: () => updateAssistant(assistantIndex, (message) => ({ ...message, streaming: false })),
@@ -129,6 +153,7 @@ export function TermConversationPopover({
           context: `当前专有名词：${term.text}\n专有名词解释：${term.explanation || "请结合上下文解释。"}\n相关回答：${context.slice(0, 4000)}`,
         },
         {
+          onMeta: () => bumpConversations(),
           onToken: (token) => setMessages((current) => {
             const next = [...current];
             if (next[assistantIndex]) next[assistantIndex] = { ...next[assistantIndex], content: next[assistantIndex].content + token };
@@ -164,9 +189,16 @@ export function TermConversationPopover({
 
   return (
     <>
-    <aside style={{ right: `${20 + depth * 24}px`, bottom: `${20 + depth * 24}px`, zIndex: 50 + depth }} className="fixed flex max-h-[min(680px,calc(100vh-2.5rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island">
-      <header className="flex items-center justify-between border-b border-claude-border/70 bg-white/90 px-4 py-3 backdrop-blur">
+    <aside style={{ right: `${20 + depth * 24}px`, bottom: `${20 + depth * 24}px`, zIndex: 50 + depth, transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }} className="fixed flex max-h-[min(680px,calc(100vh-2.5rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island">
+      <header
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className="flex cursor-move select-none items-center justify-between border-b border-claude-border/70 bg-white/90 px-4 py-3 backdrop-blur"
+      >
         <div className="flex min-w-0 items-center gap-2">
+          <GripVertical size={15} className="shrink-0 text-claude-muted/70" />
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-claude-accentSoft text-claude-accent"><GitBranch size={15} /></div>
           <div className="min-w-0">
             <div className="truncate text-sm font-extrabold text-claude-ink">围绕「{term.text}」继续提问</div>

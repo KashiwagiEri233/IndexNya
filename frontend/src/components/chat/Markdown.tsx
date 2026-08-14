@@ -36,6 +36,23 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeMathDelimiters(markdown: string) {
+  let normalized = markdown
+    // \[ ... \] → display math
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression: string) => `\n$$\n${expression.trim()}\n$$\n`)
+    // \( ... \) → inline math
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression: string) => `$${expression.trim()}$`);
+
+  // 兼容模型常输出的单行 [ \theta = ... ] 块公式。
+  normalized = normalized.replace(/(^|\n)([ \t]*)\[([^\n]*\\[A-Za-z][^\n]*)\]([ \t]*)(?=\n|$)/g, (_match, prefix: string, indent: string, expression: string, suffix: string) => (
+    `${prefix}${indent}$$\n${expression.trim()}\n${indent}$$${suffix}`
+  ));
+
+  // 兼容中文文本中的 (\alpha)、(\nabla f(\theta)) 等未加分隔符的常见写法。
+  normalized = normalized.replace(/\((?=[^()\n]*\\[A-Za-z])((?:[^()\n]|\([^()\n]*\)[^()\n]*)+)\)/g, (_match, expression: string) => `$${expression.trim()}$`);
+  return normalized;
+}
+
 /**
  * 在 Markdown AST 的 text 节点中插入 link 节点，再由 a renderer 转成按钮。
  * 直接替换原始 Markdown 文本会破坏 **粗体**、列表和链接语法。
@@ -128,7 +145,7 @@ export function Markdown({
           },
         }}
       >
-        {children}
+        {normalizeMathDelimiters(children)}
       </ReactMarkdown>
     </div>
   );

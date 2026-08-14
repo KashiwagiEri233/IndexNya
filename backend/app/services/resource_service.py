@@ -58,7 +58,7 @@ async def generate_resource(
             .all()
         )
         if msgs:
-            history_text = "\n".join(f"{m.role}: {m.content[:200]}" for m in msgs)
+            history_text = "\n".join(f"{m.role}: {m.content[:1200]}" for m in msgs)
 
     # 把历史合并进 extra 字符串传给 agent
     extra_dict = dict(extra or {})

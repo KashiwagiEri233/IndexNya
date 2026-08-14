@@ -16,6 +16,7 @@ interface ChatMsg {
   route?: { action: string; resource_type?: string; topic?: string };
   terms?: ChatTerm[];
   modelId?: string;
+  progress?: { phase: string; agent: string; status: string; detail?: string };
 }
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -303,6 +304,15 @@ export default function ChatPage() {
               return copy;
             });
           },
+          onProgress: (d) => {
+            setMessages((m) => {
+              const copy = [...m];
+              if (assistantIdx >= 0 && copy[assistantIdx]) {
+                copy[assistantIdx] = { ...copy[assistantIdx], progress: d };
+              }
+              return copy;
+            });
+          },
           onToken: (t) => {
             setMessages((m) => {
               const copy = [...m];
@@ -531,6 +541,12 @@ export default function ChatPage() {
               >
                 {m.role === "assistant" ? (
                   <>
+                    {m.progress && m.streaming && (
+                      <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-claude-panel/60 px-2 py-1 text-[11px] font-semibold text-claude-muted">
+                        <span className={cn("h-1.5 w-1.5 rounded-full", m.progress.status === "failed" ? "bg-red-400" : "bg-claude-accent animate-pulse")} />
+                        {m.progress.detail || `${m.progress.agent} 正在工作…`}
+                      </div>
+                    )}
                     {m.route && (
                       <div className="mb-2 flex items-center gap-1.5">
                         <span className="text-[11px] text-claude-muted">由</span>
