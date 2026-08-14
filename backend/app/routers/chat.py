@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..agents.base import BaseAgent
-from ..llm.factory import chat_complete, json_complete, reset_active_model, set_active_model
+from ..llm.factory import chat_complete, get_llm, json_complete, reset_active_model, set_active_model
 from ..db import get_db
 from ..models import Conversation, Message, Resource, Student
 from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest
@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 def _model_payload(payload: ChatRequest) -> dict | None:
     """只将允许的模型字段传给 LLM 工厂，避免把未知字段带入请求。"""
     return payload.model.model_dump(exclude_none=True) if payload.model else None
+
+
+def _is_local_illustration_request(message: str) -> bool:
+    return bool(re.search(r"(?:生成|制作|画|做一张|创建).{0,12}(?:插图|配图|示意图)", message))
 
 
 def _is_local_ppt_request(message: str) -> bool:
@@ -212,6 +216,9 @@ async def _stream_chat_impl(
     elif _is_local_ppt_request(payload.message):
         # PPT 使用本地模板生成，不需要模型路由。
         route = {"action": "resource", "resource_type": "ppt", "topic": payload.message}
+    elif _is_local_illustration_request(payload.message):
+        # 插图提示词使用本地模板，不需要文本模型路由。
+        route = {"action": "resource", "resource_type": "illustration", "topic": payload.message}
     else:
         try:
             from ..agents.router import RouterAgent
@@ -239,7 +246,10 @@ async def _stream_chat_impl(
         yield _sse("token", {"text": f"正在调度「{rtype}」智能体生成关于「{topic}」的资源…\n\n"})
         try:
             from ..services.resource_service import generate_resource
-            r = await generate_resource(db, student.id, rtype, topic, conversation_id=conv.id)
+            r = await generate_resource(
+                db, student.id, rtype, topic, conversation_id=conv.id,
+                image_model_config=payload.image_model.model_dump(exclude_none=True) if payload.image_model else None,
+            )
             preview = _format_resource_preview(r)
             full_text_parts.append(preview)
             yield _sse("token", {"text": preview})
@@ -371,14 +381,18 @@ async def test_model_connection(payload: ChatModelConfig) -> dict:
     """临时测试模型连接，不保存配置，也不写入数据库。"""
     token = set_active_model(payload.model_dump(exclude_none=True))
     try:
-        preview = await chat_complete(
-            [
-                {"role": "system", "content": "请只回复：连接成功"},
-                {"role": "user", "content": "测试模型连接。"},
-            ],
-            temperature=0,
-            max_tokens=16,
-        )
+        if payload.type == "image":
+            await get_llm().models.list()
+            preview = "模型接口可访问"
+        else:
+            preview = await chat_complete(
+                [
+                    {"role": "system", "content": "请只回复：连接成功"},
+                    {"role": "user", "content": "测试模型连接。"},
+                ],
+                temperature=0,
+                max_tokens=16,
+            )
         return {
             "ok": True,
             "model": payload.model,

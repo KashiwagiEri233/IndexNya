@@ -6,6 +6,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import ResourcesPage from "@/pages/ResourcesPage";
 import PathPage from "@/pages/PathPage";
 import DashboardPage from "@/pages/DashboardPage";
+import SettingsPage from "@/pages/SettingsPage";
 import { useAppStore } from "@/stores/app";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/resources" element={<ResourcesPage />} />
         <Route path="/path" element={<PathPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes>
     </AppShell>

@@ -16,9 +16,11 @@ interface AppState {
   // 前端可自行维护的 OpenAI 兼容模型列表
   models: ChatModel[];
   selectedModelId: string;
+  selectedImageModelId: string;
   addModel: (model: ChatModel) => void;
   removeModel: (id: string) => void;
   setSelectedModelId: (id: string) => void;
+  setSelectedImageModelId: (id: string) => void;
 
   // 触发资源/路径/画像刷新的计数器
   resourceVersion: number;
@@ -54,16 +56,23 @@ export const useAppStore = create<AppState>()(
 
       models: [],
       selectedModelId: "",
-      addModel: (model) => set((state) => ({
-        models: [...state.models.filter((item) => item.id !== model.id), model],
-        selectedModelId: model.id,
-      })),
+      selectedImageModelId: "",
+      addModel: (model) => set((state) => {
+        const models = [...state.models.filter((item) => item.id !== model.id), model];
+        return {
+          models,
+          selectedModelId: model.type === "image" ? state.selectedModelId : model.id,
+          selectedImageModelId: model.type === "image" ? model.id : state.selectedImageModelId,
+        };
+      }),
       removeModel: (id) => set((state) => {
         const models = state.models.filter((model) => model.id !== id);
-        const nextSelected = state.selectedModelId === id ? (models[0]?.id ?? "") : state.selectedModelId;
-        return { models, selectedModelId: nextSelected };
+        const nextSelected = state.selectedModelId === id ? (models.find((model) => model.type !== "image")?.id ?? "") : state.selectedModelId;
+        const nextImage = state.selectedImageModelId === id ? (models.find((model) => model.type === "image")?.id ?? "") : state.selectedImageModelId;
+        return { models, selectedModelId: nextSelected, selectedImageModelId: nextImage };
       }),
       setSelectedModelId: (id) => set({ selectedModelId: id }),
+      setSelectedImageModelId: (id) => set({ selectedImageModelId: id }),
 
       resourceVersion: 0,
       bumpResources: () => set({ resourceVersion: Date.now() }),
@@ -77,15 +86,20 @@ export const useAppStore = create<AppState>()(
     {
       name: "learning-agent-store",
       // 持久化当前对话和浏览器本地模型配置；学生对象每次从后端拉取
-      partialize: (s) => ({ convId: s.convId, models: s.models, selectedModelId: s.selectedModelId }),
+      partialize: (s) => ({ convId: s.convId, models: s.models, selectedModelId: s.selectedModelId, selectedImageModelId: s.selectedImageModelId }),
       // 清理旧版本遗留的内置模型，避免升级后继续出现在选择器中。
       merge: (persistedState, currentState) => {
         const persisted = (persistedState || {}) as Partial<AppState>;
-        const models = (persisted.models || []).filter((model) => Boolean(model.baseUrl || model.apiKey));
-        const selectedModelId = models.some((model) => model.id === persisted.selectedModelId)
+        const models = (persisted.models || []).filter((model) => Boolean(model.baseUrl || model.apiKey)).map((model) => ({ ...model, type: model.type === "image" ? ("image" as const) : ("chat" as const) }));
+        const chatModels = models.filter((model) => model.type !== "image");
+        const imageModels = models.filter((model) => model.type === "image");
+        const selectedModelId = chatModels.some((model) => model.id === persisted.selectedModelId)
           ? persisted.selectedModelId || ""
-          : (models[0]?.id || "");
-        return { ...currentState, ...persisted, models, selectedModelId };
+          : (chatModels[0]?.id || "");
+        const selectedImageModelId = imageModels.some((model) => model.id === persisted.selectedImageModelId)
+          ? persisted.selectedImageModelId || ""
+          : (imageModels[0]?.id || "");
+        return { ...currentState, ...persisted, models, selectedModelId, selectedImageModelId };
       },
     }
   )

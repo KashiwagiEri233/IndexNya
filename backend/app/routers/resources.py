@@ -26,6 +26,7 @@ async def generate(
             payload.topic,
             conversation_id=payload.conversation_id,
             extra=payload.extra,
+            image_model_config=payload.image_model.model_dump(exclude_none=True) if payload.image_model else None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

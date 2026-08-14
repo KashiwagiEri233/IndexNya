@@ -45,6 +45,11 @@ const ALL_FEATURES = [
 ] as const;
 
 
+function isLocalIllustrationRequest(text: string) {
+  return /(?:生成|制作|画|做一张|创建).{0,12}(?:插图|配图|示意图)/.test(text);
+}
+
+
 function isLocalPptRequest(text: string) {
   return /(?:生成|制作|做个|做一份|创建|导出).{0,12}(?:PPT|ppt|幻灯片|演示文稿|课件)/.test(text);
 }
@@ -186,7 +191,9 @@ export default function ChatPage() {
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const models = useAppStore((s) => s.models);
   const selectedModelId = useAppStore((s) => s.selectedModelId);
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? models[0];
+  const selectedImageModelId = useAppStore((s) => s.selectedImageModelId);
+  const selectedModel = models.find((model) => model.id === selectedModelId && model.type !== "image");
+  const selectedImageModel = models.find((model) => model.id === selectedImageModelId && model.type === "image");
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -229,8 +236,13 @@ export default function ChatPage() {
     if (!input.trim() || busy || !student) return;
     const text = input.trim();
     const localPpt = pendingResource === "ppt" || isLocalPptRequest(text);
-    if (!selectedModel && !localPpt) {
-      alert("请先添加并选择一个模型。");
+    const localIllustration = pendingResource === "illustration" || isLocalIllustrationRequest(text);
+    if (!selectedModel && !localPpt && !localIllustration) {
+      alert("请先添加并选择一个对话模型。");
+      return;
+    }
+    if (localIllustration && !selectedImageModel) {
+      alert("请先到设置中添加并选择图片生成模型。");
       return;
     }
     // 如果选中了某个智能体，走资源生成分支
@@ -253,7 +265,7 @@ export default function ChatPage() {
 
     try {
       await api.chatStream(
-        { conversation_id: convId ?? undefined, student_id: student.id, message: text, model: localPpt ? undefined : toRequestModel(selectedModel) },
+        { conversation_id: convId ?? undefined, student_id: student.id, message: text, model: localPpt || localIllustration ? undefined : toRequestModel(selectedModel), image_model: localIllustration ? toRequestModel(selectedImageModel) : undefined },
         {
           onMeta: (d) => {
             if (d.conversation_id) {
@@ -337,7 +349,7 @@ export default function ChatPage() {
     ]);
     const assistantIdx = messages.length + 1;
     try {
-      const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: type === "ppt" ? undefined : toRequestModel(selectedModel) });
+      const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: type === "ppt" || type === "illustration" ? undefined : toRequestModel(selectedModel), image_model: type === "illustration" ? toRequestModel(selectedImageModel) : undefined });
       bumpResources();
       bumpPath();
       let preview = "";

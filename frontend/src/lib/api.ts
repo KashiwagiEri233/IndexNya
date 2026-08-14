@@ -31,6 +31,7 @@ export interface ChatModel {
   model: string;
   baseUrl?: string;
   apiKey?: string;
+  type?: "chat" | "image";
 }
 
 export interface ChatTerm {
@@ -126,7 +127,7 @@ export const api = {
     );
   },
 
-  async testModelConnection(model: { name?: string; model: string; base_url?: string; api_key?: string }) {
+  async testModelConnection(model: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" }) {
     return j<{ ok: boolean; model: string; message: string; preview?: string; detail?: string }>(
       await fetch(`${API_BASE}/models/test`, {
         method: "POST",
@@ -170,7 +171,8 @@ export const api = {
     topic: string;
     conversation_id?: number;
     extra?: Record<string, any>;
-    model?: { name?: string; model: string; base_url?: string; api_key?: string };
+    model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
+    image_model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
   }) {
     return j<Resource>(
       await fetch(`${API_BASE}/resources/generate`, {
@@ -269,7 +271,8 @@ export const api = {
       message: string;
       resource_type?: string;
       mode?: string;
-      model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string };
+      model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
+      image_model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
       context?: string;
     },
     handlers: {

@@ -19,7 +19,8 @@ export function ModelSelector() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [testing, setTesting] = useState(false);
   const [testState, setTestState] = useState<{ ok: boolean; message: string; detail?: string } | null>(null);
-  const selected = models.find((model) => model.id === selectedModelId) ?? models[0];
+  const chatModels = models.filter((model) => model.type !== "image");
+  const selected = chatModels.find((model) => model.id === selectedModelId) ?? chatModels[0];
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -63,6 +64,7 @@ export function ModelSelector() {
         model: form.model.trim(),
         base_url: form.baseUrl.trim(),
         api_key: form.apiKey.trim(),
+        type: "chat",
       });
       setTestState({ ok: result.ok, message: result.message, detail: result.detail });
     } catch (error: any) {
@@ -106,12 +108,12 @@ export function ModelSelector() {
             <button type="button" onClick={() => { resetForm(); setOpen(false); }} className="rounded-full p-1 text-claude-muted hover:bg-claude-panel"><X size={14} /></button>
           </div>
           <div className="mt-1 space-y-1">
-            {models.length === 0 && (
+            {chatModels.length === 0 && (
               <div className="rounded-xl border border-dashed border-claude-border px-3 py-3 text-center text-xs font-semibold text-claude-muted">
                 暂无模型，请先添加一个模型
               </div>
             )}
-            {models.map((model) => (
+            {chatModels.map((model) => (
               <div key={model.id} className="flex items-center gap-1 rounded-xl px-2 py-2 hover:bg-claude-panel/70">
                 <button
                   type="button"

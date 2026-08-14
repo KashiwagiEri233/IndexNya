@@ -1,124 +1,52 @@
-"""讯飞文生图 tti API 调用工具。
-
-参考：https://www.xfyun.cn/doc/spark/ImageGeneration.html
-
-流程：HMAC-SHA256 鉴权（使用讯飞通用签名）→
-     POST /v2.1/tti → 同步返回 base64 图片 → 落盘到 outputs/images/ → 返回本地访问 URL。
-
-请求体：
-    header.app_id
-    parameter.chat.{domain: "general", width, height}
-    payload.message.text[{role:"user", content: prompt}]
-
-返回：
-    payload.choices.text[0].content  # base64 图片数据
-"""
+"""OpenAI 兼容图片生成工具 — 使用前端选择的图片模型。"""
 from __future__ import annotations
 
 import base64
-import logging
-import os
 import re
 import time
 from pathlib import Path
 from typing import Any
 
 import httpx
+from openai import AsyncOpenAI
 
-from ..config import settings
-
-logger = logging.getLogger(__name__)
-
-# 图片落盘目录
 IMAGES_DIR = Path(__file__).resolve().parent.parent.parent / "outputs" / "images"
 
 
-async def generate_image(prompt: str, width: int | None = None, height: int | None = None) -> dict[str, Any]:
-    """调用讯飞 tti 生成图片。
+async def generate_image(prompt: str, image_model: dict[str, Any] | None = None, *, size: str = "1024x1024") -> dict[str, Any]:
+    """通过前端提供的 OpenAI 兼容图片模型生成图片并保存到本地。"""
+    if not image_model:
+        return {"prompt": prompt, "status": "failed", "error": "未配置图片生成模型，请先到设置中添加图片生成模型"}
 
-    返回：
-        {
-          "prompt": ...,
-          "image_path": 本地文件绝对路径,
-          "image_url": "/api/resources/{id}/file" 形式由 service 填,
-          "base64": 原始 base64（可选）,
-          "status": "completed" | "failed",
-          "error": ...,
-        }
-    """
-    # 使用通用签名函数，并传入图像功能的独立凭证
-    from .xfyun_auth import auth_url
-
-    host = settings.image_host
-    path = settings.image_path
-    width = width or settings.image_width
-    height = height or settings.image_height
-
-    url = auth_url(
-        path, method="POST", host=host,
-        api_key=settings.image_api_key, api_secret=settings.image_api_secret,
-    )
-    body = {
-        "header": {"app_id": settings.image_app_id},
-        "parameter": {
-            "chat": {
-                "domain": "general",
-                "width": width,
-                "height": height,
-            }
-        },
-        "payload": {
-            "message": {
-                "text": [
-                    {"role": "user", "content": prompt[:1000]},  # 文档限制 1000 字
-                ]
-            }
-        },
-    }
+    model_name = str(image_model.get("model") or "").strip()
+    base_url = str(image_model.get("base_url") or "").strip()
+    api_key = str(image_model.get("api_key") or "").strip()
+    if not model_name or not base_url or not api_key:
+        return {"prompt": prompt, "status": "failed", "error": "图片模型配置不完整，需要模型 ID、Base URL 和 API Key"}
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(url, json=body)
-            resp.raise_for_status()
-            data = resp.json()
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=180.0, max_retries=1)
+        response = await client.images.generate(model=model_name, prompt=prompt[:2000], size=size)
+        item = response.data[0] if response.data else None
+        if not item:
+            return {"prompt": prompt, "status": "failed", "error": "图片模型没有返回图片"}
 
-        code = data.get("header", {}).get("code", -1)
-        if code != 0:
-            return {
-                "prompt": prompt,
-                "status": "failed",
-                "error": f"xfyun tti failed: {data}",
-            }
+        image_bytes: bytes | None = None
+        if getattr(item, "b64_json", None):
+            image_bytes = base64.b64decode(item.b64_json)
+        elif getattr(item, "url", None):
+            async with httpx.AsyncClient(timeout=120) as http:
+                download = await http.get(item.url)
+                download.raise_for_status()
+                image_bytes = download.content
+        if not image_bytes:
+            return {"prompt": prompt, "status": "failed", "error": "图片模型返回中没有可下载的图片数据"}
 
-        # payload.choices.text[0].content 是 base64
-        choices = (data.get("payload") or {}).get("choices") or {}
-        text_list = choices.get("text") or []
-        if not text_list:
-            return {"prompt": prompt, "status": "failed", "error": "no image in response"}
-
-        b64 = text_list[0].get("content", "")
-        if not b64:
-            return {"prompt": prompt, "status": "failed", "error": "empty image content"}
-
-        # 落盘
         IMAGES_DIR.mkdir(parents=True, exist_ok=True)
         safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", prompt)[:20] or "image"
         filename = f"{safe}_{int(time.time())}.png"
         file_path = IMAGES_DIR / filename
-        # 文档提示用字节流写入，避免元数据丢失
-        file_path.write_bytes(base64.b64decode(b64))
-
-        return {
-            "prompt": prompt,
-            "image_path": str(file_path),
-            "filename": filename,
-            "status": "completed",
-            "error": None,
-        }
-    except Exception as e:
-        logger.exception("image generation failed")
-        return {
-            "prompt": prompt,
-            "status": "failed",
-            "error": str(e),
-        }
+        file_path.write_bytes(image_bytes)
+        return {"prompt": prompt, "image_path": str(file_path), "filename": filename, "status": "completed", "error": None}
+    except Exception as exc:
+        return {"prompt": prompt, "status": "failed", "error": str(exc)}

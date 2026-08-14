@@ -44,6 +44,7 @@ class ChatModelConfig(BaseModel):
     """前端可选的 OpenAI 兼容模型配置。密钥仅用于当前请求，不写入数据库。"""
     id: Optional[str] = None
     name: Optional[str] = None
+    type: Optional[str] = "chat"
     model: str
     base_url: Optional[str] = None
     api_key: Optional[str] = None
@@ -64,6 +65,7 @@ class ChatRequest(BaseModel):
     resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code/illustration/ppt
     mode: str = "chat"  # chat / profile / resource / tutor
     model: Optional[ChatModelConfig] = None
+    image_model: Optional[ChatModelConfig] = None
     context: Optional[str] = None
 
 
@@ -98,6 +100,7 @@ class ResourceGenerateRequest(BaseModel):
     topic: str
     extra: dict[str, Any] = Field(default_factory=dict)
     model: Optional[ChatModelConfig] = None
+    image_model: Optional[ChatModelConfig] = None
 
 
 class ResourceOut(BaseModel):

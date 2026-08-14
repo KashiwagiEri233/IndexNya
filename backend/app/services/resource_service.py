@@ -37,6 +37,7 @@ async def generate_resource(
     topic: str,
     conversation_id: int | None = None,
     extra: dict[str, Any] | None = None,
+    image_model_config: dict[str, Any] | None = None,
 ) -> Resource:
     """统一资源生成入口。"""
     if resource_type not in _GENERATORS:
@@ -96,7 +97,7 @@ async def generate_resource(
             text = await agent_cls().generate(topic, profile, extra=extra_str)
             content = {"markdown": text}
         elif resource_type == "illustration":
-            content = await agent_cls().generate(topic, profile)
+            content = await agent_cls().generate(topic, profile, image_model=image_model_config)
         elif resource_type == "ppt":
             content = await agent_cls().generate(topic, profile, extra=extra_str)
         else:

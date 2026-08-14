@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2 } from "lucide-react";
+import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -204,6 +204,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           {profile && <div className="mt-2 text-[10px] font-extrabold text-claude-accent">画像版本 v{profile.version}</div>}
+          <button type="button" onClick={() => navigate("/settings")} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
+            <Settings size={13} /> 设置
+          </button>
         </div>
       </aside>
 
