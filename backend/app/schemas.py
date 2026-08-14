@@ -40,6 +40,19 @@ class ProfileUpdate(BaseModel):
 
 
 # ===== 对话 =====
+class ChatModelConfig(BaseModel):
+    """前端可选的 OpenAI 兼容模型配置。密钥仅用于当前请求，不写入数据库。"""
+    id: Optional[str] = None
+    name: Optional[str] = None
+    model: str
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+class BranchConversationRequest(BaseModel):
+    title: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     """流式对话请求。
 
@@ -48,8 +61,10 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[int] = None
     student_id: Optional[int] = None
     message: str
-    resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code/video/illustration
+    resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code/illustration/ppt
     mode: str = "chat"  # chat / profile / resource / tutor
+    model: Optional[ChatModelConfig] = None
+    context: Optional[str] = None
 
 
 class MessageOut(BaseModel):
@@ -68,6 +83,7 @@ class ConversationOut(BaseModel):
     id: int
     student_id: int
     title: str
+    parent_conversation_id: Optional[int] = None
     created_at: datetime
 
     class Config:
@@ -78,9 +94,10 @@ class ConversationOut(BaseModel):
 class ResourceGenerateRequest(BaseModel):
     student_id: int
     conversation_id: Optional[int] = None
-    type: str  # lecture/mindmap/quiz/reading/code/video/illustration
+    type: str  # lecture/mindmap/quiz/reading/code/illustration/ppt
     topic: str
     extra: dict[str, Any] = Field(default_factory=dict)
+    model: Optional[ChatModelConfig] = None
 
 
 class ResourceOut(BaseModel):
@@ -120,7 +137,7 @@ class TutorAskRequest(BaseModel):
     student_id: int
     question: str
     context_resource_id: Optional[int] = None
-    modality: str = "text"  # text / diagram / video
+    modality: str = "text"  # text / diagram / video（推荐相关视频）
 
 
 # ===== 学习效果评估 =====

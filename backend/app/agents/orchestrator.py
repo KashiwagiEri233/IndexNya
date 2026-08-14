@@ -18,7 +18,6 @@ from .profiler import ProfilerAgent
 from .quizmaster import QuizmasterAgent
 from .reader import ReaderAgent
 from .tutor import TutorAgent
-from .videoist import VideoistAgent
 
 # 角色注册表
 AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
@@ -28,7 +27,6 @@ AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
     "quiz": QuizmasterAgent,
     "reading": ReaderAgent,
     "code": CoderAgent,
-    "video": VideoistAgent,
     "illustration": IllustratorAgent,
     "ppt": PPTistAgent,
     "image_reader": ImageReaderAgent,
@@ -43,7 +41,6 @@ RESOURCE_AGENT_MAP: dict[str, str] = {
     "quiz": "quiz",
     "reading": "reading",
     "code": "code",
-    "video": "video",
     "illustration": "illustration",
     "ppt": "ppt",
 }

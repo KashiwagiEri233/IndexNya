@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Video, Image as ImageIcon, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Presentation, Download, ExternalLink } from "lucide-react";
+import { FileText, Image as ImageIcon, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Presentation, Download, ExternalLink } from "lucide-react";
 import { api, type Resource } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { MindmapTree } from "@/components/resources/MindmapTree";
@@ -15,12 +15,11 @@ const TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
   quiz: { label: "练习题库", icon: ListChecks, color: "text-green-600" },
   reading: { label: "拓展阅读", icon: BookOpen, color: "text-amber-600" },
   code: { label: "代码实操", icon: Code, color: "text-cyan-600" },
-  video: { label: "教学视频", icon: Video, color: "text-red-600" },
   illustration: { label: "教学插图", icon: ImageIcon, color: "text-pink-600" },
   ppt: { label: "教学PPT", icon: Presentation, color: "text-orange-600" },
 };
 
-const FILTERS = ["all", "lecture", "mindmap", "quiz", "reading", "code", "video", "illustration", "ppt"];
+const FILTERS = ["all", "lecture", "mindmap", "quiz", "reading", "code", "illustration", "ppt"];
 
 function ResourceCard({ r }: { r: Resource }) {
   const meta = TYPE_META[r.type] ?? { label: r.type, icon: FileText, color: "" };
@@ -54,58 +53,12 @@ function ResourceCard({ r }: { r: Resource }) {
   );
 }
 
-function VideoBody({ r }: { r: Resource }) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(r.file_url);
-  const [status, setStatus] = useState<string>(r.status);
-
-  useEffect(() => {
-    if (videoUrl || status !== "processing") return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await api.videoStatus(r.id);
-        if (cancelled) return;
-        if (res.status === "completed" && res.video_url) {
-          setVideoUrl(res.video_url);
-          setStatus("completed");
-        } else if (res.status === "failed") {
-          setStatus("failed");
-        }
-      } catch {
-        // 忽略，下次重试
-      }
-    };
-    poll();
-    const t = setInterval(poll, 10000); // 10 秒轮询一次
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [r.id, videoUrl, status]);
-
-  if (status === "failed") {
-    return <p className="text-sm text-red-500">视频生成失败</p>;
-  }
-  if (videoUrl) {
-    return <video src={videoUrl} controls className="w-full rounded-md max-h-80" />;
-  }
-  return (
-    <div className="text-sm text-claude-muted flex items-center gap-2 py-4">
-      <Loader2 size={16} className="animate-spin" />
-      数字人视频生成中（通常需 2-5 分钟），请稍候…
-    </div>
-  );
-}
-
 function ResourceBody({ r }: { r: Resource }) {
   if (r.status === "failed") {
     return <p className="text-sm text-red-500">生成失败：{r.content?.error ?? "未知错误"}</p>;
   }
   if (r.status === "processing") {
     return <p className="text-sm text-claude-muted">生成中…</p>;
-  }
-  if (r.type === "video") {
-    return <VideoBody r={r} />;
   }
   if (r.type === "illustration" && r.file_url) {
     return <img src={r.file_url} alt={r.title} className="w-full rounded-md max-h-80 object-contain" />;
@@ -115,7 +68,7 @@ function ResourceBody({ r }: { r: Resource }) {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Presentation size={20} className="text-orange-600" />
-          <span className="text-sm font-medium">讯飞智能 PPT（在线生成）</span>
+          <span className="text-sm font-medium">本地生成 PPT</span>
         </div>
         <div className="flex items-center gap-2">
           <a href={r.file_url} target="_blank" rel="noreferrer"
@@ -135,7 +88,7 @@ function ResourceBody({ r }: { r: Resource }) {
             <pre className="mt-1 p-2 bg-claude-panel rounded whitespace-pre-wrap">{r.content.query}</pre>
           </details>
         )}
-        <p className="text-xs text-claude-muted">链接由讯飞服务端保存 30 天。</p>
+        <p className="text-xs text-claude-muted">文件由本地模板生成并保存在当前服务端。</p>
       </div>
     );
   }
@@ -225,7 +178,7 @@ export default function ResourcesPage() {
           <div className="text-center py-16 text-claude-muted">
             <FileText size={40} className="mx-auto mb-3" />
             <p className="font-medium text-claude-ink">还没有生成资源</p>
-            <p className="mt-2 text-sm">去对话页选择智能体生成第一份资源。</p>
+            <p className="mt-2 text-sm">去对话页选择一种内容类型，生成你的第一份学习资料。</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

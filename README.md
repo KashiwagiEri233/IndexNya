@@ -1,22 +1,21 @@
-# Index-学习智能助手
+# Index 学习岛
 
-> 面向大学生的多智能体个性化学习资源生成系统
-> 技术栈：React + FastAPI，UI 对齐 Claude 网页端
+> 面向大学生的学习记录、资料整理与路径规划工具
+> 技术栈：React + FastAPI
 
 ## 功能
 
-1. **对话式学习画像自主构建** — 自然语言对话自动抽取特征，构建 8 维度动态学生画像
-2. **多智能体协同资源生成** — 7 类角色 agent 协作生成讲解文档/思维导图/题库/拓展阅读/代码案例/教学视频/教学插图
-3. **个性化学习路径规划** — 多智能体整合资源，规划动态学习步骤与依赖
-4. **智能辅导（加分）** — 多模态答疑：文字 + 图解 + 数字人视频讲解
-5. **学习效果评估（加分）** — 跟踪学习行为，多维度精准评估并动态调整推送
+1. **学习对话与记录** — 通过对话梳理专业方向、学习目标和当前难点
+2. **学习资料整理** — 生成讲解文档、思维导图、练习题、拓展阅读、代码案例和插图；需要视频时提供 Bilibili 相关视频链接
+3. **学习路径规划** — 根据学习目标和已有资料拆解学习步骤与先后关系
+4. **多种答疑方式** — 支持文字、图片、图解，并可推荐 Bilibili 相关视频
+5. **学习反馈** — 记录学习过程，查看阶段性进展和待改进的部分
 
 ## 技术栈
 
 - **后端**：Python 3.12 · FastAPI · SQLAlchemy 2 · SQLite
 - **前端**：Vite · React 18 · TypeScript · Tailwind · shadcn/ui
-- **LLM**：讯飞星火 X2（OpenAI 兼容协议，`/x2/chat/completions`，model 字段填 `spark-x`，可切换 provider）
-- **视频**：讯飞数字人视频生成 API
+- **模型接口**：支持任意 OpenAI 兼容模型，前端可自行添加和切换；PPT 使用本地模板生成
 - **图像**：兼容 OpenAI DALL·E 协议
 
 ## 快速开始
@@ -25,7 +24,7 @@
 
 ```bash
 cp .env.example .env
-# 填入讯飞 APIPassword、AppID、APIKey、APISecret
+# 按需填入图片等服务的凭证
 ```
 
 ### 2. 后端
@@ -51,11 +50,10 @@ npm run dev
 ## 架构
 
 ```
-后端 agents/        — 多智能体（profiler/lecturer/mindmap/quizmaster/
-                      reader/coder/videoist/illustrator/pathplanner/tutor）
-后端 llm/          — OpenAI 兼容封装，按 .env 切换 provider
-后端 tools/        — 讯飞视频、图像生成、画像存储
-前端 pages/        — Chat / Profile / Resources / Path / Dashboard
+后端 agents/        — 讲解、导图、题库、阅读、代码等内容模块
+后端 llm/           — OpenAI 兼容接口封装，按配置切换模型
+后端 tools/         — 图像生成与文件处理
+前端 pages/         — Chat / Profile / Resources / Path / Dashboard
 ```
 
 详见各目录 README。

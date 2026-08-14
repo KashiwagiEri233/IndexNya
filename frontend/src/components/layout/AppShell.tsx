@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, User, FileText, Map, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight } from "lucide-react";
+import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ const NAV = [
   { to: "/chat", label: "学习对话", icon: Sparkles, tone: "text-island-coral" },
   { to: "/profile", label: "学习画像", icon: User, tone: "text-island-lavender" },
   { to: "/resources", label: "资源岛", icon: FileText, tone: "text-island-sky" },
-  { to: "/path", label: "成长路径", icon: Map, tone: "text-island-teal" },
+  { to: "/path", label: "成长路径", icon: MapIcon, tone: "text-island-teal" },
   { to: "/dashboard", label: "学习评估", icon: BarChart3, tone: "text-island-butter" },
 ];
 
@@ -19,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const convId = useAppStore((s) => s.convId);
   const setConvId = useAppStore((s) => s.setConvId);
   const conversationVersion = useAppStore((s) => s.conversationVersion);
+  const bumpConversations = useAppStore((s) => s.bumpConversations);
   const navigate = useNavigate();
 
   const { data: profile } = useQuery({
@@ -43,6 +44,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     navigate("/chat");
   }
 
+  async function deleteConversation(id: number, title: string) {
+    if (!window.confirm(`确定删除“${title}”吗？如果它有子对话，子对话也会一并删除。`)) return;
+    try {
+      const result = await api.deleteConversation(id);
+      if (convId != null && result.deleted_ids.includes(convId)) {
+        setConvId(null);
+        navigate("/chat");
+      }
+      bumpConversations();
+    } catch (error: any) {
+      alert(`删除对话失败：${error.message}`);
+    }
+  }
+
+  const conversationRows: { conversation: (typeof conversations extends (infer Item)[] | undefined ? Item : never); depth: number }[] = [];
+  const renderedIds = new Set<number>();
+  const allConversations = conversations ?? [];
+  const childrenByParent = new Map<number, typeof allConversations>();
+  for (const conversation of allConversations) {
+    if (conversation.parent_conversation_id != null) {
+      const children = childrenByParent.get(conversation.parent_conversation_id) ?? [];
+      children.push(conversation);
+      childrenByParent.set(conversation.parent_conversation_id, children);
+    }
+  }
+
+  function appendConversationTree(parentId: number | null, depth: number) {
+    const items = parentId == null
+      ? allConversations.filter((conversation) => conversation.parent_conversation_id == null)
+      : (childrenByParent.get(parentId) ?? []);
+    for (const conversation of items) {
+      if (renderedIds.has(conversation.id)) continue;
+      renderedIds.add(conversation.id);
+      conversationRows.push({ conversation, depth });
+      appendConversationTree(conversation.id, depth + 1);
+    }
+  }
+  appendConversationTree(null, 0);
+  // 防止父会话因数据迁移/删除缺失时，子对话在侧边栏中消失。
+  for (const conversation of allConversations) {
+    if (!renderedIds.has(conversation.id)) {
+      renderedIds.add(conversation.id);
+      conversationRows.push({ conversation, depth: 0 });
+      appendConversationTree(conversation.id, 1);
+    }
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-claude-bg">
       <aside className="relative flex w-[17rem] shrink-0 flex-col overflow-hidden border-r border-claude-border/80 bg-[#f3faf8]">
@@ -59,7 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="leading-tight">
               <div className="text-[15px] font-extrabold tracking-tight text-claude-ink">Index 学习岛</div>
-              <div className="mt-1 text-[11px] font-bold text-claude-muted">你的 AI 成长伙伴</div>
+              <div className="mt-1 text-[11px] font-bold text-claude-muted">记录、整理、持续进步</div>
             </div>
           </div>
         </div>
@@ -109,20 +157,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 还没有对话，去岛上探索吧
               </div>
             )}
-            {(conversations ?? []).map((c) => (
-              <button
+            {conversationRows.map(({ conversation: c, depth }) => (
+              <div
                 key={c.id}
-                onClick={() => switchConversation(c.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition-colors",
-                  convId === c.id
-                    ? "bg-white text-claude-ink shadow-soft"
-                    : "text-claude-muted hover:bg-white/75 hover:text-claude-ink"
+                  "group flex items-center rounded-2xl transition-colors",
+                  depth > 0 ? "ml-4 w-[calc(100%-1rem)] border-l border-claude-border/80 pl-2" : "w-full"
                 )}
               >
-                <MessageSquare size={14} className="shrink-0 text-claude-accent" />
-                <span className="truncate">{c.title}</span>
-              </button>
+                <button
+                  onClick={() => switchConversation(c.id)}
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left text-sm font-semibold transition-colors",
+                    depth > 0 ? "pl-1" : "px-3",
+                    convId === c.id
+                      ? "bg-white text-claude-ink shadow-soft"
+                      : "text-claude-muted hover:bg-white/75 hover:text-claude-ink"
+                  )}
+                >
+                  {depth > 0 ? (
+                    <GitBranch size={13} className="shrink-0 text-island-lavender" />
+                  ) : (
+                    <MessageSquare size={14} className="shrink-0 text-claude-accent" />
+                  )}
+                  <span className="truncate">{c.title}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteConversation(c.id, c.title)}
+                  className="mr-1 shrink-0 rounded-lg p-1.5 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus:opacity-100"
+                  title={depth > 0 ? "删除子对话" : "删除对话及其子对话"}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             ))}
           </div>
         </div>

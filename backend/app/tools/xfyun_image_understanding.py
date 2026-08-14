@@ -21,19 +21,19 @@ from typing import AsyncIterator
 import websockets
 
 from ..config import settings
-from .xfyun_video import _auth_url
+from .xfyun_auth import auth_url
 
 logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4MB
 
 
-def _ws_auth_url() -> str:
+def _wsauth_url() -> str:
     """生成 wss 鉴权 URL。
 
-    _auth_url 默认返回 https://，讯飞 ws 接口需替换为 wss://。
+    auth_url 默认返回 https://，讯飞 ws 接口需替换为 wss://。
     """
-    url = _auth_url(
+    url = auth_url(
         settings.image_understanding_path,
         method="GET",  # WebSocket 握手用 GET
         host=settings.image_host,
@@ -103,7 +103,7 @@ async def understand_image_stream(
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     payload = _build_payload(image_b64, question, history)
-    ws_url = _ws_auth_url()
+    ws_url = _wsauth_url()
 
     logger.info("connecting xfyun image understanding ws: %s", ws_url[:60] + "...")
     # proxy=None 显式禁用系统代理检测（websockets 默认会读系统代理）

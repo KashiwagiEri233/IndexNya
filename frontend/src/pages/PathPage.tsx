@@ -71,7 +71,7 @@ export default function PathPage() {
               </Button>
             </div>
             <p className="mt-2 text-xs text-claude-muted">
-              多智能体协同：整合你的画像与已生成资源，规划动态学习节点序列。
+              结合你的学习记录和已有资料，拆解出清晰的学习步骤。
             </p>
           </CardContent>
         </Card>
@@ -82,7 +82,7 @@ export default function PathPage() {
           <div className="text-center py-12 text-claude-muted">
             <MapIcon size={40} className="mx-auto mb-3" />
             <p className="font-medium text-claude-ink">还没有学习路径</p>
-            <p className="mt-2 text-sm">输入学习目标，让智能体为你规划路径。</p>
+            <p className="mt-2 text-sm">输入学习目标，我会帮你拆解成清晰的学习步骤。</p>
           </div>
         ) : (
           <>

@@ -25,10 +25,24 @@ export interface Message {
   created_at: string;
 }
 
+export interface ChatModel {
+  id: string;
+  name: string;
+  model: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
+export interface ChatTerm {
+  text: string;
+  explanation?: string;
+}
+
 export interface Conversation {
   id: number;
   student_id: number;
   title: string;
+  parent_conversation_id?: number | null;
   created_at: string;
 }
 
@@ -81,7 +95,7 @@ async function j<T>(resp: Response): Promise<T> {
 
 export const api = {
   async health() {
-    return j<{ status: string; llm_ready: boolean; video_ready: boolean }>(
+    return j<{ status: string; llm_ready: boolean }>(
       await fetch(`${API_BASE}/health`)
     );
   },
@@ -112,6 +126,32 @@ export const api = {
     );
   },
 
+  async testModelConnection(model: { name?: string; model: string; base_url?: string; api_key?: string }) {
+    return j<{ ok: boolean; model: string; message: string; preview?: string; detail?: string }>(
+      await fetch(`${API_BASE}/models/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(model),
+      })
+    );
+  },
+
+  async deleteConversation(conversationId: number) {
+    return j<{ deleted_ids: number[] }>(
+      await fetch(`${API_BASE}/conversations/${conversationId}`, { method: "DELETE" })
+    );
+  },
+
+  async branchConversation(conversationId: number, title?: string) {
+    return j<Conversation & { branched_from: number }>(
+      await fetch(`${API_BASE}/conversations/${conversationId}/branch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(title ? { title } : {}),
+      })
+    );
+  },
+
   async getMessages(conversationId: number) {
     return j<any[]>(
       await fetch(`${API_BASE}/conversations/${conversationId}/messages`)
@@ -130,6 +170,7 @@ export const api = {
     topic: string;
     conversation_id?: number;
     extra?: Record<string, any>;
+    model?: { name?: string; model: string; base_url?: string; api_key?: string };
   }) {
     return j<Resource>(
       await fetch(`${API_BASE}/resources/generate`, {
@@ -214,16 +255,6 @@ export const api = {
     );
   },
 
-  async videoStatus(resourceId: number): Promise<{
-    status: string;
-    video_url?: string | null;
-    task_id?: string;
-    message?: string;
-    error?: string;
-  }> {
-    return j<any>(await fetch(`${API_BASE}/resources/${resourceId}/video-status`));
-  },
-
   async getAssessment(studentId: number) {
     return j<AssessmentDashboard>(
       await fetch(`${API_BASE}/assessment/${studentId}`)
@@ -238,6 +269,8 @@ export const api = {
       message: string;
       resource_type?: string;
       mode?: string;
+      model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string };
+      context?: string;
     },
     handlers: {
       onMeta?: (d: any) => void;
@@ -245,6 +278,7 @@ export const api = {
       onToken?: (t: string) => void;
       onProfile?: (d: any) => void;
       onResource?: (d: any) => void;
+      onTerms?: (d: any) => void;
       onDone?: (d: any) => void;
       onError?: (m: string) => void;
     },
@@ -298,6 +332,9 @@ export const api = {
             break;
           case "resource":
             handlers.onResource?.(parsed);
+            break;
+          case "terms":
+            handlers.onTerms?.(parsed);
             break;
           case "done":
             handlers.onDone?.(parsed);

@@ -13,7 +13,6 @@ from ..agents.mindmap import MindmapAgent
 from ..agents.pptist import PPTistAgent
 from ..agents.quizmaster import QuizmasterAgent
 from ..agents.reader import ReaderAgent
-from ..agents.videoist import VideoistAgent
 from ..models import Profile, Resource
 from .profile_service import get_latest_profile, profile_to_dict
 
@@ -26,7 +25,6 @@ _GENERATORS = {
     "quiz": ("练习题库", QuizmasterAgent),
     "reading": ("拓展阅读", ReaderAgent),
     "code": ("代码实操", CoderAgent),
-    "video": ("教学视频", VideoistAgent),
     "illustration": ("教学插图", IllustratorAgent),
     "ppt": ("教学PPT", PPTistAgent),
 }
@@ -97,10 +95,6 @@ async def generate_resource(
         elif resource_type == "code":
             text = await agent_cls().generate(topic, profile, extra=extra_str)
             content = {"markdown": text}
-        elif resource_type == "video":
-            # extra.short=True 时生成短文案（视频 ≤10 秒，适合测试）
-            short = bool((extra or {}).get("short")) if isinstance(extra, dict) else False
-            content = await agent_cls().generate(topic, profile, short=short)
         elif resource_type == "illustration":
             content = await agent_cls().generate(topic, profile)
         elif resource_type == "ppt":
@@ -109,23 +103,15 @@ async def generate_resource(
             content = {}
 
         r.content = content
-        # video 资源异步生成：提交后立即返回 processing，不阻塞等待
-        if resource_type == "video" and content.get("status") == "processing":
-            r.status = "processing"
-            r.meta = {"task_id": content.get("task_id")}
-        else:
-            r.status = "completed"
-        # video 资源类型附带 file_url
-        if resource_type == "video" and content.get("video_url"):
-            r.file_url = content["video_url"]
-            r.status = "completed"
+        r.status = "completed"
         # illustration 资源：讯飞 tti 返回 base64，落盘后用后端文件端点访问
         if resource_type == "illustration" and content.get("image_path"):
             r.file_url = f"/api/resources/{r.id}/file"
             r.meta = {"filename": content.get("filename") or "image.png"}
-        # ppt 资源：file_url 直接存讯飞返回的在线 pptUrl
-        if resource_type == "ppt" and content.get("ppt_url"):
-            r.file_url = content["ppt_url"]
+        # 本地 PPT 文件通过统一文件接口下载。
+        if resource_type == "ppt" and content.get("ppt_path"):
+            r.file_url = f"/api/resources/{r.id}/file"
+            r.meta = {"filename": content.get("filename") or "learning.pptx"}
     except Exception as e:
         logger.exception("resource generation failed: %s", resource_type)
         r.status = "failed"

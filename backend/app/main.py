@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="多智能体个性化学习资源生成系统",
+    description="面向学习记录、资料整理与路径规划的工具",
     lifespan=lifespan,
 )
 
@@ -56,7 +56,5 @@ def health() -> dict:
         "status": "ok",
         "app_name": settings.app_name,
         "llm_ready": settings.llm_ready,
-        "video_ready": settings.video_ready,
-        "ppt_ready": settings.ppt_ready,
         "image_ready": settings.image_ready,
     }

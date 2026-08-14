@@ -1,15 +1,15 @@
 """智能辅导 Agent — 功能4。
 
-多模态答疑：文字 + 图解 + 短视频讲解。
+学习答疑：文字、图解与外部视频资料推荐。
 """
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from ..llm.factory import chat_complete
 from .base import BaseAgent
 from .illustrator import IllustratorAgent
-from .videoist import VideoistAgent
 
 
 class TutorAgent(BaseAgent):
@@ -23,7 +23,7 @@ class TutorAgent(BaseAgent):
 4. 给出 1-2 个变式练习，巩固理解
 5. 用中文，语气鼓励
 
-如果问题适合视频讲解，可在末尾标注 [需视频讲解: 简短主题]，由系统调用数字人 agent。"""
+如果问题适合视频学习，可在末尾标注 [需视频讲解: 简短主题]，系统会推荐 Bilibili 相关视频。"""
 
     async def answer(
         self,
@@ -41,19 +41,16 @@ class TutorAgent(BaseAgent):
         )
         text = result.text
 
-        out: dict[str, Any] = {"text": text, "video": None, "diagram": None}
+        out: dict[str, Any] = {"text": text, "video_topic": None, "diagram": None}
 
-        # 文字答疑里检测到 [需视频讲解: xxx] 则触发数字人
+        # 需要视频时只记录主题，实际由上层生成 Bilibili 搜索链接。
         if modality == "video" or "[需视频讲解" in text:
             import re
             m = re.search(r"\[需视频讲解[:：]\s*(.+?)\]", text)
-            topic = m.group(1).strip() if m else question[:30]
-            try:
-                videoist = VideoistAgent()
-                video = await videoist.generate(topic, profile)
-                out["video"] = video
-            except Exception as e:
-                out["video"] = {"status": "failed", "error": str(e)}
+            out["video_topic"] = (m.group(1).strip() if m else question[:30])
+            out["video_url"] = "https://search.bilibili.com/all?keyword=" + quote(out["video_topic"][:80])
+            text = re.sub(r"\s*\[需视频讲解[:：]\s*.+?\]", "", text).strip()
+            out["text"] = text
 
         # 图解模态：触发插画
         if modality == "diagram":

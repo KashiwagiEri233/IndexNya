@@ -56,7 +56,7 @@ export default function ProfilePage() {
               <User size={40} className="mx-auto mb-3 text-claude-muted" />
               <p className="font-medium">还没有学习画像</p>
               <p className="mt-2 text-sm text-claude-muted">
-                去对话页和智能体聊聊你的专业、目标、薄弱点，系统会自动构建画像。
+                去对话页聊聊你的专业、目标和薄弱点，这里会逐步整理成学习档案。
               </p>
             </CardContent>
           </Card>

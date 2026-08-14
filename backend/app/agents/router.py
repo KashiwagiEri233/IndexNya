@@ -38,7 +38,6 @@ resource 时必须填 resource_type：
 - quiz：练习题库（"题目""练习""做题""测试""考试题"）
 - reading：拓展阅读（"推荐书""文献""阅读材料""参考资料"）
 - code：代码实操（"代码""编程""实现""写程序""示例代码"）
-- video：教学视频（"视频""讲解视频""数字人讲"）
 - illustration：教学插图（"插图""配图""画个图""示意图"）
 - ppt：教学PPT（"PPT""幻灯片""演示文稿"）
 
@@ -53,7 +52,7 @@ topic 字段：资源/答疑的主题（简短，如"二叉树""快速排序"）
 用户：我想做栈和队列的练习题 → {"action":"resource","resource_type":"quiz","topic":"栈和队列"}
 用户：什么是动态规划？ → {"action":"tutor","topic":"什么是动态规划"}
 用户：写段快速排序代码 → {"action":"resource","resource_type":"code","topic":"快速排序"}
-用户：讲排序算法的视频 → {"action":"resource","resource_type":"video","topic":"排序算法"}
+用户：讲排序算法的视频 → {"action":"tutor","topic":"排序算法"}
 用户：推荐几本机器学习书 → {"action":"resource","resource_type":"reading","topic":"机器学习"}
 用户：做个神经网络PPT → {"action":"resource","resource_type":"ppt","topic":"神经网络"}
 用户：画张卷积神经网络示意图 → {"action":"resource","resource_type":"illustration","topic":"卷积神经网络"}
@@ -62,8 +61,7 @@ topic 字段：资源/答疑的主题（简短，如"二叉树""快速排序"）
 1. 只输出 JSON，不要解释、不要 Markdown、不要代码块
 2. 模糊时优先 chat
 3. topic 要简短（通常 2-10 字）
-4. 关键区分：用户"描述自己的学习背景/偏好"（如"喜欢看视频""大二学生"）是 chat；
-   用户"要求生成视频"（如"帮我做个视频""生成讲解视频"）才是 resource/video
+4. 用户需要视频时不要生成视频文件，按学习问题回答，并提供 Bilibili 相关视频搜索链接。
 5. 仅当用户明确要求生成某种资料时才走 resource；否则一律 chat"""
 
     async def route(
@@ -132,6 +130,10 @@ topic 字段：资源/答疑的主题（简短，如"二叉树""快速排序"）
         result: dict[str, Any] = {"action": action, "topic": topic}
         if action == "resource":
             rtype = str(data.get("resource_type", "")).lower()
-            valid = {"lecture", "mindmap", "quiz", "reading", "code", "video", "illustration", "ppt"}
-            result["resource_type"] = rtype if rtype in valid else "lecture"
+            if rtype == "video":
+                result["action"] = "tutor"
+                result["video_topic"] = topic or original_message[:30]
+            else:
+                valid = {"lecture", "mindmap", "quiz", "reading", "code", "illustration", "ppt"}
+                result["resource_type"] = rtype if rtype in valid else "lecture"
         return result

@@ -1,10 +1,7 @@
-"""LLM Provider 封装 — 基于讯飞星火 X1（OpenAI 兼容协议）。
-
-切换 provider 只需改 .env 三行：
-    LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
-"""
+"""LLM Provider 封装 — 支持前端传入或 .env 显式配置的 OpenAI 兼容模型。"""
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Any, AsyncIterator, Optional
 
 from openai import AsyncOpenAI
@@ -12,18 +9,35 @@ from openai import AsyncOpenAI
 from ..config import settings
 
 
-def get_llm() -> AsyncOpenAI:
-    """获取异步 OpenAI 兼容客户端。
+# 每个请求独立的模型配置，避免并发对话互相覆盖。
+_active_model: ContextVar[dict[str, Any] | None] = ContextVar("active_model", default=None)
 
-    星火 X1 配置：
-        base_url = https://spark-api-open.xf-yun.com/v2/
-        api_key  = 控制台 APIPassword
-        model    = spark-x
-    """
+
+def set_active_model(config: Optional[dict[str, Any]]):
+    """为当前异步请求设置模型配置，返回可用于 reset 的 token。"""
+    return _active_model.set(config or None)
+
+
+def reset_active_model(token) -> None:
+    _active_model.reset(token)
+
+
+def _model_settings() -> tuple[str, str, str]:
+    override = _active_model.get() or {}
+    model = str(override.get("model") or settings.llm_model).strip()
+    base_url = str(override.get("base_url") or settings.llm_base_url).strip()
+    api_key = str(override.get("api_key") or settings.llm_api_key).strip()
+    if not model or not base_url or not api_key:
+        raise RuntimeError("未配置可用模型，请先在前端添加并选择模型，或在 .env 中显式配置 LLM_MODEL、LLM_BASE_URL 和 LLM_API_KEY")
+    return model, base_url, api_key
+
+
+def get_llm() -> AsyncOpenAI:
+    """获取当前请求对应的 OpenAI 兼容异步客户端。"""
+    _, base_url, api_key = _model_settings()
     return AsyncOpenAI(
-        api_key=settings.llm_api_key or "missing",
-        base_url=settings.llm_base_url,
-        # 讯飞 X2 偶发 504，加长超时 + 自动重试 3 次
+        api_key=api_key,
+        base_url=base_url,
         timeout=120.0,
         max_retries=3,
     )
@@ -39,8 +53,9 @@ async def chat_complete(
 ) -> str:
     """非流式补全，返回完整文本。"""
     llm = get_llm()
+    model, _, _ = _model_settings()
     kwargs: dict[str, Any] = dict(
-        model=settings.llm_model,
+        model=model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -59,13 +74,11 @@ async def chat_stream(
     temperature: float = 0.7,
     max_tokens: int = 4096,
 ) -> AsyncIterator[str]:
-    """流式补全，yield 增量文本 chunk。
-
-    星火 X1 兼容 OpenAI SSE 格式：choices[0].delta.content
-    """
+    """流式补全，yield 增量文本 chunk。"""
     llm = get_llm()
+    model, _, _ = _model_settings()
     stream = await llm.chat.completions.create(
-        model=settings.llm_model,
+        model=model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -86,10 +99,7 @@ async def json_complete(
     temperature: float = 0.3,
     max_tokens: int = 4096,
 ) -> str:
-    """请求 JSON 格式输出（星火遵循 prompt 指令）。
-
-    我们在 messages 末尾追加 JSON 指令，并尝试解析。
-    """
+    """请求 JSON 格式输出。"""
     prompt = messages[-1]["content"] if messages else ""
     messages = list(messages)
     messages[-1] = {

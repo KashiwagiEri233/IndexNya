@@ -2,7 +2,7 @@
 
 参考：https://www.xfyun.cn/doc/spark/ImageGeneration.html
 
-流程：HMAC-SHA256 鉴权（与视频 API 同套通用签名）→
+流程：HMAC-SHA256 鉴权（使用讯飞通用签名）→
      POST /v2.1/tti → 同步返回 base64 图片 → 落盘到 outputs/images/ → 返回本地访问 URL。
 
 请求体：
@@ -46,15 +46,15 @@ async def generate_image(prompt: str, width: int | None = None, height: int | No
           "error": ...,
         }
     """
-    # 复用视频 API 的通用签名函数（传入图像功能的独立凭证）
-    from .xfyun_video import _auth_url
+    # 使用通用签名函数，并传入图像功能的独立凭证
+    from .xfyun_auth import auth_url
 
     host = settings.image_host
     path = settings.image_path
     width = width or settings.image_width
     height = height or settings.image_height
 
-    url = _auth_url(
+    url = auth_url(
         path, method="POST", host=host,
         api_key=settings.image_api_key, api_secret=settings.image_api_secret,
     )

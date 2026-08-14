@@ -11,16 +11,19 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import AsyncIterator
+import re
+from typing import Any, AsyncIterator
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..agents.base import BaseAgent
+from ..llm.factory import chat_complete, json_complete, reset_active_model, set_active_model
 from ..db import get_db
-from ..models import Conversation, Message, Student
-from ..schemas import ChatRequest
+from ..models import Conversation, Message, Resource, Student
+from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest
 from ..services.profile_service import (
     extract_profile_from_history,
     get_latest_profile,
@@ -31,19 +34,97 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _model_payload(payload: ChatRequest) -> dict | None:
+    """只将允许的模型字段传给 LLM 工厂，避免把未知字段带入请求。"""
+    return payload.model.model_dump(exclude_none=True) if payload.model else None
+
+
+def _is_local_ppt_request(message: str) -> bool:
+    return bool(re.search(r"(?:生成|制作|做个|做一份|创建|导出).{0,12}(?:PPT|ppt|幻灯片|演示文稿|课件)", message))
+
+
+def _bilibili_search_markdown(topic: str) -> str:
+    clean_topic = (topic or "学习讲解").strip()[:80]
+    url = "https://search.bilibili.com/all?keyword=" + quote(clean_topic)
+    return f"\n\n📺 Bilibili 相关视频：[搜索「{clean_topic}」]({url})"
+
+
+def _friendly_model_test_error(error: Exception) -> str:
+    """把供应商返回的长 HTML/错误堆栈转换成可读提示。"""
+    raw = str(error).strip()
+    lower = raw.lower()
+    if "<!doctype html" in lower or "<html" in lower or "404 - page not found" in lower:
+        return "接口返回了网页 404，而不是模型 API 响应。请检查 Base URL，填写 OpenAI 兼容 API 地址，不要填写网页首页地址。"
+    if len(raw) > 360:
+        return raw[:360].rstrip() + "…"
+    return raw or "未知连接错误"
+
+
+async def _extract_terms(answer: str) -> list[dict[str, str]]:
+    """从回答中提取可点击的专有名词，失败时返回空列表。"""
+    if len(answer.strip()) < 24:
+        return []
+    sample = answer[:8000]
+    prompt = f"""请从下面这段学习助手回答中提取适合学生点击追问的专有名词。
+
+要求：
+1. 只提取技术名词、学科概念、实体名称、方法/框架/协议名称，不要提取普通动词、形容词或泛化词。
+2. text 必须是回答中原样出现的连续短语，不能改写。
+3. 最多提取 10 个，优先选择最值得展开解释的词。
+4. explanation 用一句中文简要解释这个词，方便子对话展示。
+5. 如果没有合适的词，返回空数组。
+
+只输出 JSON 数组，格式如下：
+[{{"text":"虚拟 DOM","explanation":"用于描述界面结构并优化更新过程的内存表示"}}]
+
+回答内容：
+{sample}"""
+    try:
+        raw = await json_complete([
+            {"role": "system", "content": "你是一个严谨的学习内容术语标注器。"},
+            {"role": "user", "content": prompt},
+        ], temperature=0.1, max_tokens=1200)
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        data: Any = json.loads(cleaned)
+        if isinstance(data, dict):
+            data = data.get("terms", [])
+        if not isinstance(data, list):
+            return []
+
+        terms: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("text") or "").strip()
+            explanation = str(item.get("explanation") or "").strip()
+            if not text or text in seen or len(text) > 48 or text not in answer:
+                continue
+            if len(explanation) > 180:
+                explanation = explanation[:180].rstrip() + "…"
+            terms.append({"text": text, "explanation": explanation})
+            seen.add(text)
+            if len(terms) >= 10:
+                break
+        return terms
+    except Exception as exc:
+        logger.debug("term extraction skipped: %s", exc)
+        return []
+
+
 def _format_resource_preview(r) -> str:
     """把生成的资源格式化为对话流中的预览 Markdown。"""
     type_label = {
         "lecture": "讲解文档", "mindmap": "思维导图", "quiz": "练习题库",
-        "reading": "拓展阅读", "code": "代码实操", "video": "教学视频",
+        "reading": "拓展阅读", "code": "代码实操",
         "illustration": "教学插图", "ppt": "教学PPT",
     }.get(r.type, r.type)
     header = f"✅ 已生成 **{type_label}**：{r.title}\n\n"
     content = r.content or {}
     if r.status == "failed":
         return f"⚠️ {type_label} 生成失败：{content.get('error', '未知错误')}"
-    if r.type == "video" and r.file_url:
-        return header + f"[▶ 查看视频]({r.file_url})"
     if r.type == "illustration" and r.file_url:
         return header + f"![教学插图]({r.file_url})"
     if r.type == "ppt" and r.file_url:
@@ -70,7 +151,7 @@ DEFAULT_PROFILE_AGENT_PROMPT = """你是一位学习画像构建智能体，同�
 回复用中文，语气亲切像辅导员。一次不要问太多问题。"""
 
 
-async def _stream_chat(
+async def _stream_chat_impl(
     db: Session,
     payload: ChatRequest,
 ) -> AsyncIterator[str]:
@@ -88,6 +169,8 @@ async def _stream_chat(
     conv = None
     if payload.conversation_id:
         conv = db.get(Conversation, payload.conversation_id)
+    if conv and payload.student_id and conv.student_id != student.id:
+        raise HTTPException(403, "conversation does not belong to student")
     if not conv:
         title = payload.message[:24] if payload.message else "新对话"
         conv = Conversation(student_id=student.id, title=title)
@@ -122,7 +205,13 @@ async def _stream_chat(
     #    payload.resource_type 显式指定时跳过路由，直接用指定类型
     explicit = payload.resource_type
     if explicit:
-        route = {"action": "resource", "resource_type": explicit, "topic": payload.message}
+        if explicit == "video":
+            route = {"action": "tutor", "topic": payload.message, "video_topic": payload.message}
+        else:
+            route = {"action": "resource", "resource_type": explicit, "topic": payload.message}
+    elif _is_local_ppt_request(payload.message):
+        # PPT 使用本地模板生成，不需要模型路由。
+        route = {"action": "resource", "resource_type": "ppt", "topic": payload.message}
     else:
         try:
             from ..agents.router import RouterAgent
@@ -170,8 +259,16 @@ async def _stream_chat(
             text = result.get("text", "")
             full_text_parts.append(text)
             yield _sse("token", {"text": text})
-            if result.get("video", {}).get("video_url"):
-                yield _sse("token", {"text": "\n\n📹 [数字人讲解视频](" + result["video"]["video_url"] + ")"})
+            video_topic = result.get("video_topic") or route.get("video_topic")
+            if video_topic:
+                video_url = result.get("video_url")
+                link = (
+                    f"\n\n📺 Bilibili 相关视频：[搜索「{video_topic}」]({video_url})"
+                    if video_url
+                    else _bilibili_search_markdown(video_topic)
+                )
+                full_text_parts.append(link)
+                yield _sse("token", {"text": link})
         except Exception as e:
             logger.exception("tutor in chat failed")
             err = f"⚠️ 辅导失败：{e}"
@@ -180,7 +277,12 @@ async def _stream_chat(
     else:
         # chat：默认对话流式（画像构建 + 通用回答）
         agent = BaseAgent()
-        extra_context = f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}" if profile else ""
+        extra_context_parts: list[str] = []
+        if profile:
+            extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
+        if payload.context:
+            extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
+        extra_context = "\n\n".join(extra_context_parts)
         try:
             async for chunk in agent.stream(
                 payload.message,
@@ -197,14 +299,20 @@ async def _stream_chat(
             return
 
     full_text = "".join(full_text_parts)
-
-    # 6. 画像抽取：每次对话后自动触发（不再依赖 [[PROFILE_READY]] 标记）
-    #    节流：累计消息 ≥3 条才抽；且不论是否更新都尝试（ProfilerAgent 会基于全历史判断）
-    profile_updated = False
-    # 去掉遗留的标记（兼容旧 prompt）
+    # 去掉遗留的画像标记后再提取专有名词，避免标记进入术语列表。
     if "[[PROFILE_READY]]" in full_text:
         full_text = full_text.replace("[[PROFILE_READY]]", "").strip()
 
+    # 6. 提取回答中的专有名词，供前端渲染为可点击子对话入口。
+    terms: list[dict[str, str]] = []
+    if action in {"chat", "tutor"}:
+        terms = await _extract_terms(full_text)
+        if terms:
+            yield _sse("terms", {"terms": terms})
+
+    # 7. 画像抽取：每次对话后自动触发（不再依赖 [[PROFILE_READY]] 标记）
+    #    节流：累计消息 ≥3 条才抽；且不论是否更新都尝试（ProfilerAgent 会基于全历史判断）
+    profile_updated = False
     # 仅 chat 动作触发（resource/tutor 不触发，避免干扰）
     if action == "chat":
         try:
@@ -227,7 +335,13 @@ async def _stream_chat(
         conversation_id=conv.id,
         role="assistant",
         content=full_text,
-        meta={"profile_updated": profile_updated, "mode": payload.mode, "action": action},
+        meta={
+            "profile_updated": profile_updated,
+            "mode": payload.mode,
+            "action": action,
+            "terms": terms,
+            "model_id": payload.model.id if payload.model else None,
+        },
     )
     db.add(asst_msg)
     db.commit()
@@ -235,9 +349,55 @@ async def _stream_chat(
     yield _sse("done", {"conversation_id": conv.id, "student_id": student.id})
 
 
+async def _stream_chat(db: Session, payload: ChatRequest) -> AsyncIterator[str]:
+    """在当前请求上下文启用前端选择的模型。"""
+    from ..llm.factory import reset_active_model, set_active_model
+
+    token = set_active_model(_model_payload(payload))
+    try:
+        async for event in _stream_chat_impl(db, payload):
+            yield event
+    finally:
+        reset_active_model(token)
+
+
 def _sse(event: str, data: dict) -> str:
     """格式化为 SSE 事件。"""
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/models/test")
+async def test_model_connection(payload: ChatModelConfig) -> dict:
+    """临时测试模型连接，不保存配置，也不写入数据库。"""
+    token = set_active_model(payload.model_dump(exclude_none=True))
+    try:
+        preview = await chat_complete(
+            [
+                {"role": "system", "content": "请只回复：连接成功"},
+                {"role": "user", "content": "测试模型连接。"},
+            ],
+            temperature=0,
+            max_tokens=16,
+        )
+        return {
+            "ok": True,
+            "model": payload.model,
+            "message": "模型连接成功",
+            "preview": preview[:120],
+        }
+    except Exception as exc:
+        logger.warning("model connection test failed for %s: %s", payload.model, exc)
+        raw_detail = str(exc).strip()
+        if payload.api_key:
+            raw_detail = raw_detail.replace(payload.api_key, "***")
+        return {
+            "ok": False,
+            "model": payload.model,
+            "message": f"模型连接失败：{_friendly_model_test_error(exc)}",
+            "detail": raw_detail[:4000],
+        }
+    finally:
+        reset_active_model(token)
 
 
 @router.post("/chat")
@@ -254,6 +414,96 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> Streaming
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/conversations/{conversation_id}/branch")
+def branch_conversation(
+    conversation_id: int,
+    payload: BranchConversationRequest | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    """从已有对话复制出一个独立侧边对话，保留当前上下文但后续消息互不影响。"""
+    source = db.get(Conversation, conversation_id)
+    if not source:
+        raise HTTPException(404, "conversation not found")
+
+    title = (payload.title if payload else None) or f"侧边：{source.title}"
+    branch = Conversation(
+        student_id=source.student_id,
+        title=title[:128],
+        parent_conversation_id=source.id,
+    )
+    db.add(branch)
+    db.flush()
+    source_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == source.id)
+        .order_by(Message.created_at.asc(), Message.id.asc())
+        .all()
+    )
+    for message in source_messages:
+        db.add(Message(
+            conversation_id=branch.id,
+            role=message.role,
+            content=message.content,
+            meta={**(message.meta or {}), "branched_from": source.id},
+        ))
+    db.commit()
+    db.refresh(branch)
+    return {
+        "id": branch.id,
+        "student_id": branch.student_id,
+        "title": branch.title,
+        "parent_conversation_id": branch.parent_conversation_id,
+        "created_at": branch.created_at.isoformat(),
+        "branched_from": source.id,
+    }
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int, db: Session = Depends(get_db)) -> dict:
+    """删除一条对话及其所有子对话、消息；资源本身保留但解除会话关联。"""
+    root = db.get(Conversation, conversation_id)
+    if not root:
+        raise HTTPException(404, "conversation not found")
+
+    all_conversations = (
+        db.query(Conversation)
+        .filter(Conversation.student_id == root.student_id)
+        .all()
+    )
+    parent_by_id: dict[int, int | None] = {}
+    for conversation in all_conversations:
+        parent_id = conversation.parent_conversation_id
+        # 兼容添加父子字段前创建的旧分支。
+        if parent_id is None:
+            first_message = (
+                db.query(Message)
+                .filter(Message.conversation_id == conversation.id)
+                .order_by(Message.id.asc())
+                .first()
+            )
+            parent_id = (first_message.meta or {}).get("branched_from") if first_message else None
+        parent_by_id[conversation.id] = parent_id
+
+    ids = [root.id]
+    index = 0
+    while index < len(ids):
+        ids.extend(
+            conversation_id
+            for conversation_id, parent_id in parent_by_id.items()
+            if parent_id == ids[index] and conversation_id not in ids
+        )
+        index += 1
+
+    # 资源不随聊天记录删除，只解除会话关联，避免资料库内容意外丢失。
+    db.query(Resource).filter(Resource.conversation_id.in_(ids)).update(
+        {Resource.conversation_id: None}, synchronize_session=False
+    )
+    db.query(Message).filter(Message.conversation_id.in_(ids)).delete(synchronize_session=False)
+    db.query(Conversation).filter(Conversation.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted_ids": ids}
 
 
 @router.get("/conversations/{conversation_id}/messages")
@@ -279,8 +529,23 @@ def list_conversations(student_id: int, db: Session = Depends(get_db)) -> list[d
         .order_by(Conversation.created_at.desc())
         .all()
     )
-    return [
-        {"id": c.id, "student_id": c.student_id, "title": c.title,
-         "created_at": c.created_at.isoformat()}
-        for c in convs
-    ]
+    result = []
+    for conversation in convs:
+        parent_id = conversation.parent_conversation_id
+        # 兼容早期已经创建的分支：分支消息中保存了 branched_from。
+        if parent_id is None:
+            first_message = (
+                db.query(Message)
+                .filter(Message.conversation_id == conversation.id)
+                .order_by(Message.id.asc())
+                .first()
+            )
+            parent_id = (first_message.meta or {}).get("branched_from") if first_message else None
+        result.append({
+            "id": conversation.id,
+            "student_id": conversation.student_id,
+            "title": conversation.title,
+            "parent_conversation_id": parent_id,
+            "created_at": conversation.created_at.isoformat(),
+        })
+    return result

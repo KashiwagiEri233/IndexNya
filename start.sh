@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键启动学习智能体系统（前后端）
+# 一键启动 Index 学习岛（前后端）
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 echo "=== 启动后端 (FastAPI :8000) ==="

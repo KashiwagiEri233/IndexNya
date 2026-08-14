@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..llm.factory import reset_active_model, set_active_model
 from ..schemas import ResourceGenerateRequest, ResourceOut
 from ..services.resource_service import generate_resource, list_resources
 
@@ -16,6 +17,7 @@ async def generate(
     payload: ResourceGenerateRequest,
     db: Session = Depends(get_db),
 ) -> ResourceOut:
+    token = set_active_model(payload.model.model_dump(exclude_none=True) if payload.model else None)
     try:
         r = await generate_resource(
             db,
@@ -27,6 +29,8 @@ async def generate(
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
+    finally:
+        reset_active_model(token)
     return ResourceOut.model_validate(r)
 
 
@@ -56,56 +60,20 @@ def get_file(resource_id: int, db: Session = Depends(get_db)):
     r = db.get(Resource, resource_id)
     if not r:
         raise HTTPException(404, "resource not found")
-    if r.type != "illustration":
-        raise HTTPException(400, "resource has no file")
     content = r.content or {}
-    file_path = content.get("image_path")
+    if r.type == "illustration":
+        file_path = content.get("image_path")
+        media_type = "image/png"
+        default_filename = "image.png"
+        not_found_message = "image file not found on disk"
+    elif r.type == "ppt":
+        file_path = content.get("ppt_path")
+        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        default_filename = "learning.pptx"
+        not_found_message = "ppt file not found on disk"
+    else:
+        raise HTTPException(400, "resource has no downloadable file")
     if not file_path or not Path(file_path).exists():
-        raise HTTPException(404, "image file not found on disk")
-    filename = (r.meta or {}).get("filename") or "image.png"
-    return FileResponse(
-        path=file_path,
-        media_type="image/png",
-        filename=filename,
-    )
-
-
-@router.get("/{resource_id}/video-status")
-async def video_status(resource_id: int, db: Session = Depends(get_db)):
-    """轮询视频生成任务状态。讯飞数字人视频异步生成，前端定时查询。"""
-    from ..models import Resource
-    from ..tools.xfyun_video import query_video_task
-
-    r = db.get(Resource, resource_id)
-    if not r:
-        raise HTTPException(404, "resource not found")
-    if r.type != "video":
-        raise HTTPException(400, "resource is not a video")
-
-    # 已完成直接返回
-    if r.status == "completed" and r.file_url:
-        return {"status": "completed", "video_url": r.file_url}
-
-    task_id = (r.meta or {}).get("task_id")
-    if not task_id:
-        return {"status": r.status, "message": "no task_id"}
-
-    try:
-        data = await query_video_task(task_id)
-        payload = data.get("payload") or data
-        video_url = payload.get("video")
-        if video_url:
-            r.file_url = video_url
-            r.status = "completed"
-            content = dict(r.content or {})
-            content["video_url"] = video_url
-            content["cover_url"] = payload.get("image")
-            content["audio_url"] = payload.get("audio")
-            content["status"] = "completed"
-            r.content = content
-            db.commit()
-            return {"status": "completed", "video_url": video_url}
-        # 仍在生成
-        return {"status": "processing", "task_id": task_id, "raw": payload}
-    except Exception as e:
-        return {"status": "failed", "error": str(e)}
+        raise HTTPException(404, not_found_message)
+    filename = (r.meta or {}).get("filename") or default_filename
+    return FileResponse(path=file_path, media_type=media_type, filename=filename)
