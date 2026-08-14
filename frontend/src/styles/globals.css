@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,85 +15,83 @@
   }
   body {
     @apply bg-claude-bg text-claude-ink font-sans antialiased;
+    background-image:
+      radial-gradient(circle at 92% 4%, rgba(178, 223, 219, .26), transparent 23rem),
+      radial-gradient(circle at 6% 94%, rgba(250, 227, 217, .30), transparent 22rem);
   }
   * {
     @apply border-claude-border;
+  }
+  button,
+  input,
+  textarea {
+    font: inherit;
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-claude-accent text-white hover:bg-claude-accentHover;
+    @apply btn bg-claude-accent text-white shadow-soft hover:-translate-y-0.5 hover:bg-claude-accentHover hover:shadow-island;
   }
   .btn-ghost {
-    @apply btn text-claude-ink hover:bg-claude-panel;
+    @apply btn text-claude-ink hover:bg-white hover:text-claude-accent hover:shadow-soft;
   }
   .card {
-    @apply rounded-xl border bg-white shadow-soft;
+    @apply rounded-island border bg-white shadow-soft;
   }
   .input {
-    @apply w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-claude-accent/30;
+    @apply w-full rounded-xl border bg-white px-4 py-2.5 text-sm outline-none transition-shadow focus:ring-4 focus:ring-claude-accent/20;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full bg-claude-panel px-2.5 py-0.5 text-xs text-claude-muted;
+    @apply inline-flex items-center gap-1 rounded-full bg-claude-accentSoft px-3 py-1 text-xs font-bold text-claude-accent;
+  }
+  .island-header {
+    @apply min-h-[4.25rem] border-b border-claude-border/80 px-6 flex items-center justify-between sticky top-0 bg-claude-bg/95 backdrop-blur-md z-10;
+  }
+  .island-header-title {
+    @apply inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 shadow-soft;
+  }
+  .island-header-title h1 {
+    @apply text-[15px] font-extrabold tracking-tight;
+  }
+  .island-surface {
+    @apply rounded-island border border-white/80 bg-white/85 shadow-soft backdrop-blur-sm;
+  }
+  .island-dot-pattern {
+    background-image: radial-gradient(rgba(104, 170, 167, .22) 1px, transparent 1px);
+    background-size: 16px 16px;
   }
 }
 
-/* markdown 渲染样式 */
+/* Markdown rendering */
 .prose-claude {
   @apply text-[15px] leading-7 text-claude-ink;
 }
 .prose-claude h1,
 .prose-claude h2,
 .prose-claude h3 {
-  @apply font-semibold mt-5 mb-2;
+  @apply font-extrabold mt-5 mb-2;
 }
 .prose-claude h1 { @apply text-xl; }
 .prose-claude h2 { @apply text-lg; }
 .prose-claude h3 { @apply text-base; }
 .prose-claude p { @apply my-2; }
-.prose-claude ul {
-  @apply list-disc pl-6 my-2;
-}
-.prose-claude ol {
-  @apply list-decimal pl-6 my-2;
-}
+.prose-claude ul { @apply list-disc pl-6 my-2; }
+.prose-claude ol { @apply list-decimal pl-6 my-2; }
 .prose-claude li { @apply my-1; }
-.prose-claude code {
-  @apply rounded bg-claude-panel px-1.5 py-0.5 text-[13px] font-mono;
-}
-.prose-claude pre {
-  @apply rounded-lg bg-[#1f1e1d] text-[#faf9f5] p-4 my-3 overflow-x-auto text-[13px];
-}
-.prose-claude pre code {
-  @apply bg-transparent p-0 text-inherit;
-}
-.prose-claude blockquote {
-  @apply border-l-4 border-claude-accent pl-3 italic text-claude-muted my-2;
-}
-.prose-claude table {
-  @apply w-full border-collapse my-3 text-sm;
-}
+.prose-claude code { @apply rounded-lg bg-claude-accentSoft px-1.5 py-0.5 text-[13px] font-mono text-claude-ink; }
+.prose-claude pre { @apply rounded-island bg-[#2f4144] text-[#f8fffd] p-4 my-3 overflow-x-auto text-[13px] shadow-soft; }
+.prose-claude pre code { @apply bg-transparent p-0 text-inherit; }
+.prose-claude blockquote { @apply border-l-4 border-island-coral pl-3 italic text-claude-muted my-2; }
+.prose-claude table { @apply w-full border-collapse my-3 text-sm; }
 .prose-claude th,
-.prose-claude td {
-  @apply border px-2 py-1 text-left;
-}
-.prose-claude a {
-  @apply text-claude-accent underline;
-}
+.prose-claude td { @apply border px-2 py-1 text-left; }
+.prose-claude a { @apply font-bold text-claude-accent underline decoration-claude-accent/40 underline-offset-2; }
 
-/* 滚动条 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(104, 170, 167, .28); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(104, 170, 167, .48); }

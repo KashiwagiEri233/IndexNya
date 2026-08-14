@@ -196,8 +196,8 @@ export default function ResourcesPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="h-14 border-b px-5 flex items-center justify-between sticky top-0 bg-claude-bg z-10">
-        <div className="flex items-center gap-2">
+      <header className="island-header">
+        <div className="island-header-title">
           <FileText size={18} className="text-claude-accent" />
           <h1 className="font-semibold">资源库</h1>
           <Badge variant="accent">{filtered.length} 项</Badge>

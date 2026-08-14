@@ -10,14 +10,14 @@ export const Badge = React.forwardRef<
   const variants = {
     default: "bg-claude-panel text-claude-muted",
     accent: "bg-claude-accentSoft text-claude-accent",
-    success: "bg-green-100 text-green-700",
+    success: "bg-emerald-100 text-emerald-700",
     warn: "bg-amber-100 text-amber-700",
   };
   return (
     <span
       ref={ref}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide",
         variants[variant],
         className
       )}

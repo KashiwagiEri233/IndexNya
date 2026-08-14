@@ -31,7 +31,7 @@ export default function PathPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="h-14 border-b px-5 flex items-center gap-2 sticky top-0 bg-claude-bg z-10">
+      <header className="island-header justify-start gap-2">
         <MapIcon size={18} className="text-claude-accent" />
         <h1 className="font-semibold">学习路径</h1>
         {path && <Badge variant="accent">v{path.version}</Badge>}

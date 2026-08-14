@@ -10,13 +10,16 @@ app/agents/__init__.py
 app/agents/base.py
 app/agents/coder.py
 app/agents/illustrator.py
+app/agents/image_reader.py
 app/agents/lecturer.py
 app/agents/mindmap.py
 app/agents/orchestrator.py
 app/agents/pathplanner.py
+app/agents/pptist.py
 app/agents/profiler.py
 app/agents/quizmaster.py
 app/agents/reader.py
+app/agents/router.py
 app/agents/tutor.py
 app/agents/videoist.py
 app/llm/__init__.py
@@ -24,6 +27,7 @@ app/llm/factory.py
 app/routers/__init__.py
 app/routers/assessment.py
 app/routers/chat.py
+app/routers/image_understanding.py
 app/routers/paths.py
 app/routers/profile.py
 app/routers/resources.py
@@ -36,6 +40,8 @@ app/services/profile_service.py
 app/services/resource_service.py
 app/tools/__init__.py
 app/tools/image_gen.py
+app/tools/xfyun_image_understanding.py
+app/tools/xfyun_ppt.py
 app/tools/xfyun_video.py
 learning_agent_backend.egg-info/PKG-INFO
 learning_agent_backend.egg-info/SOURCES.txt

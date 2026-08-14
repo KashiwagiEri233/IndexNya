@@ -10,6 +10,7 @@ Requires-Dist: pydantic>=2.6
 Requires-Dist: pydantic-settings>=2.2
 Requires-Dist: openai>=1.30
 Requires-Dist: httpx>=0.27
+Requires-Dist: websockets>=12.0
 Requires-Dist: python-multipart>=0.0.9
 Requires-Dist: python-dotenv>=1.0
 Requires-Dist: sse-starlette>=2.1

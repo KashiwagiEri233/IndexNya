@@ -8,7 +8,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     <input
       ref={ref}
       className={cn(
-        "h-9 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-claude-accent/30",
+        "h-10 w-full rounded-xl border bg-white px-4 py-2.5 text-sm outline-none transition-shadow placeholder:text-claude-muted/70 focus:ring-4 focus:ring-claude-accent/20",
         className
       )}
       {...props}
@@ -24,7 +24,7 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-claude-accent/30 resize-none",
+      "w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none transition-shadow placeholder:text-claude-muted/70 focus:ring-4 focus:ring-claude-accent/20 resize-none",
       className
     )}
     {...props}

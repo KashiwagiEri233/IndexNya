@@ -280,8 +280,8 @@ export default function ChatPage() {
   return (
     <div className="flex h-full flex-col">
       {/* 头部 */}
-      <header className="h-14 border-b px-5 flex items-center justify-between bg-claude-bg">
-        <div className="flex items-center gap-2">
+      <header className="island-header">
+        <div className="island-header-title">
           <Sparkles size={18} className="text-claude-accent" />
           <h1 className="font-semibold">学习对话</h1>
         </div>
@@ -291,7 +291,7 @@ export default function ChatPage() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 && (
-            <div className="text-center py-16 text-claude-muted">
+            <div className="island-dot-pattern animate-float-in rounded-[2rem] border border-white bg-white/55 px-5 py-16 text-center text-claude-muted shadow-soft">
               <Sparkles size={40} className="mx-auto mb-3 text-claude-accent" />
               <p className="text-lg font-medium text-claude-ink">你好，我是你的 Index-学习智能助手</p>
               <p className="mt-2 text-sm">聊聊你的专业、目标、薄弱点，我会构建你的学习画像并生成个性化资源。</p>
@@ -308,16 +308,16 @@ export default function ChatPage() {
           {messages.map((m, i) => (
             <div key={i} className={cn("flex gap-3 animate-fade-in", m.role === "user" ? "justify-end" : "")}>
               {m.role === "assistant" && (
-                <div className="h-8 w-8 shrink-0 rounded-full bg-claude-accent flex items-center justify-center text-white">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-claude-accent text-white shadow-soft">
                   <Sparkles size={16} />
                 </div>
               )}
               <div
                 className={cn(
-                  "max-w-[80%] rounded-2xl px-4 py-3",
+                  "max-w-[80%] rounded-[1.35rem] px-4 py-3 shadow-soft",
                   m.role === "user"
-                    ? "bg-claude-user text-claude-ink"
-                    : "bg-claude-assistant border shadow-soft"
+                    ? "rounded-br-md bg-claude-user text-claude-ink"
+                    : "rounded-bl-md border bg-claude-assistant"
                 )}
               >
                 {m.role === "assistant" ? (
@@ -386,7 +386,7 @@ export default function ChatPage() {
               e.target.value = "";
             }}
           />
-          <div className="rounded-xl border bg-white shadow-soft focus-within:ring-2 focus-within:ring-claude-accent/30 overflow-hidden">
+          <div className="overflow-hidden rounded-[1.5rem] border border-white bg-white shadow-island focus-within:ring-4 focus-within:ring-claude-accent/15">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -402,7 +402,7 @@ export default function ChatPage() {
               className="border-0 shadow-none focus:ring-0 rounded-none min-h-[48px] max-h-40 bg-transparent"
             />
             {/* 底部工具栏：左附件 + 右发送按钮 + 模型名 */}
-            <div className="flex items-center justify-between px-2 py-1.5 border-t border-claude-border/60 bg-claude-panel/30">
+            <div className="flex items-center justify-between border-t border-claude-border/60 bg-claude-panel/35 px-3 py-2">
               <button
                 disabled={busy}
                 onClick={() => fileRef.current?.click()}
@@ -418,7 +418,7 @@ export default function ChatPage() {
                 <button
                   onClick={send}
                   disabled={busy || !input.trim()}
-                  className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-claude-accent text-white hover:bg-claude-accentHover disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-claude-accent text-white shadow-soft transition-all hover:-translate-y-0.5 hover:bg-claude-accentHover disabled:pointer-events-none disabled:opacity-40"
                   title="发送"
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
