@@ -8,6 +8,7 @@ interface TermMessage {
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
+  terms?: ChatTerm[];
 }
 
 function toRequestModel(model?: ChatModel) {
@@ -28,6 +29,7 @@ export function TermConversationPopover({
   context,
   model,
   onClose,
+  depth = 0,
 }: {
   term: ChatTerm;
   conversationId: number;
@@ -35,12 +37,14 @@ export function TermConversationPopover({
   context: string;
   model?: ChatModel;
   onClose: () => void;
+  depth?: number;
 }) {
   const [messages, setMessages] = useState<TermMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const explanationStarted = useRef(false);
+  const [nestedTerm, setNestedTerm] = useState<{ term: ChatTerm; context: string; branchId?: number } | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -51,6 +55,18 @@ export function TermConversationPopover({
     explanationStarted.current = true;
     void generateExplanation();
   }, [conversationId, model?.id]);
+
+  async function openNestedTerm(nextTerm: ChatTerm, nextContext: string) {
+    if (nestedTerm) return;
+    setNestedTerm({ term: nextTerm, context: nextContext });
+    try {
+      const branch = await api.branchConversation(conversationId, `围绕「${nextTerm.text}」的讨论`);
+      setNestedTerm({ term: nextTerm, context: nextContext, branchId: branch.id });
+    } catch (error: any) {
+      setNestedTerm(null);
+      alert(`打开子对话失败：${error.message}`);
+    }
+  }
 
   function updateAssistant(index: number, update: (message: TermMessage) => TermMessage) {
     setMessages((current) => {
@@ -76,6 +92,7 @@ export function TermConversationPopover({
         },
         {
           onToken: (token) => updateAssistant(assistantIndex, (message) => ({ ...message, content: message.content + token })),
+          onTerms: (data) => updateAssistant(assistantIndex, (message) => ({ ...message, terms: Array.isArray(data.terms) ? data.terms : [] })),
           onDone: () => updateAssistant(assistantIndex, (message) => ({ ...message, streaming: false })),
           onError: (message) => updateAssistant(assistantIndex, (current) => ({ ...current, content: `⚠️ ${message}`, streaming: false })),
         },
@@ -117,6 +134,11 @@ export function TermConversationPopover({
             if (next[assistantIndex]) next[assistantIndex] = { ...next[assistantIndex], content: next[assistantIndex].content + token };
             return next;
           }),
+          onTerms: (data) => setMessages((current) => {
+            const next = [...current];
+            if (next[assistantIndex]) next[assistantIndex] = { ...next[assistantIndex], terms: Array.isArray(data.terms) ? data.terms : [] };
+            return next;
+          }),
           onDone: () => setMessages((current) => {
             const next = [...current];
             if (next[assistantIndex]) next[assistantIndex] = { ...next[assistantIndex], streaming: false };
@@ -141,7 +163,8 @@ export function TermConversationPopover({
   }
 
   return (
-    <aside className="fixed bottom-5 right-5 z-50 flex max-h-[min(680px,calc(100vh-2.5rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island">
+    <>
+    <aside style={{ right: `${20 + depth * 24}px`, bottom: `${20 + depth * 24}px`, zIndex: 50 + depth }} className="fixed flex max-h-[min(680px,calc(100vh-2.5rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island">
       <header className="flex items-center justify-between border-b border-claude-border/70 bg-white/90 px-4 py-3 backdrop-blur">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-claude-accentSoft text-claude-accent"><GitBranch size={15} /></div>
@@ -163,7 +186,7 @@ export function TermConversationPopover({
           {messages.map((message, index) => (
             <div key={index} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "")}>
               <div className={cn("max-w-[88%] rounded-2xl px-3 py-2 text-sm shadow-soft", message.role === "user" ? "rounded-br-md bg-claude-user" : "rounded-bl-md border bg-white")}>
-                {message.role === "assistant" ? (message.content ? <Markdown>{message.content}</Markdown> : <span className="text-claude-muted">…</span>) : <div className="whitespace-pre-wrap">{message.content}</div>}
+                {message.role === "assistant" ? (message.content ? <Markdown terms={message.terms} onTermClick={(nextTerm) => openNestedTerm(nextTerm, message.content)}>{message.content}</Markdown> : <span className="text-claude-muted">…</span>) : <div className="whitespace-pre-wrap">{message.content}</div>}
                 {message.streaming && <span className="ml-1 inline-block h-4 w-1 animate-pulse align-middle bg-claude-accent" />}
               </div>
             </div>
@@ -181,5 +204,20 @@ export function TermConversationPopover({
         </div>
       </div>
     </aside>
+    {nestedTerm?.branchId && (
+      <TermConversationPopover
+        term={nestedTerm.term}
+        conversationId={nestedTerm.branchId}
+        studentId={studentId}
+        context={nestedTerm.context}
+        model={model}
+        depth={depth + 1}
+        onClose={() => setNestedTerm(null)}
+      />
+    )}
+    {nestedTerm && !nestedTerm.branchId && (
+      <div className="fixed bottom-5 right-5 z-[70] rounded-2xl border border-white bg-white px-4 py-3 text-xs font-bold text-claude-muted shadow-island">正在打开「{nestedTerm.term.text}」子对话…</div>
+    )}
+    </>
   );
 }

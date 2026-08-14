@@ -92,9 +92,11 @@ def _add_callout(slide, text: str, top=Inches(5.65)):
     run.font.color.rgb = NAVY
 
 
-def _build_outline(topic: str) -> list[tuple[str, list[str], str | None]]:
+def _build_outline(topic: str, context: list[str]) -> list[tuple[str, list[str], str | None]]:
+    context_items = context[:4] or [f"本次课件围绕“{topic}”展开。"]
     return [
         ("学习目标", [f"理解“{topic}”的基本定义", "掌握核心概念与相互关系", "能够用一个简单例子说明它的作用"], "先建立整体认识，再进入细节。"),
+        ("本次学习背景", context_items, "课件内容根据当前对话和学习记录整理。"),
         ("核心概念", [f"{topic}解决什么问题", "它由哪些关键部分组成", "这些部分之间如何配合"], "把复杂内容拆成几个可以分别理解的小块。"),
         ("学习要点", [f"定义：用一句话说明{topic}", "过程：按顺序列出关键步骤", "判断：如何看出结果是否合理"], "遇到新概念时，可以按照“定义—过程—判断”来梳理。"),
         ("示例与应用", [f"从一个常见问题出发理解{topic}", "按照步骤完成一次简单演示", "观察结果并说明原因"], "先看一个小例子，再迁移到更复杂的问题。"),
@@ -103,9 +105,27 @@ def _build_outline(topic: str) -> list[tuple[str, list[str], str | None]]:
     ]
 
 
-def generate_local_ppt(topic: str, *, extra: str = "") -> dict[str, Any]:
-    """使用固定教学模板生成本地 .pptx 文件。"""
+def _context_items(profile: dict | None, extra: str) -> list[str]:
+    items: list[str] = []
+    for key, label in (("major", "专业方向"), ("learning_goals", "学习目标"), ("knowledge_base", "基础情况"), ("common_mistakes", "常见难点")):
+        value = (profile or {}).get(key)
+        if value:
+            items.append(f"{label}：{str(value)[:100]}")
+    history = extra.split("对话历史：", 1)[-1] if "对话历史：" in extra else ""
+    history = history.split("额外要求：", 1)[0]
+    for line in history.splitlines():
+        line = line.strip()
+        if line.startswith("user:") or line.startswith("用户:"):
+            text = line.split(":", 1)[-1].strip()
+            if text and text not in items:
+                items.append(f"对话中提出的问题：{text[:120]}")
+    return items[:4]
+
+
+def generate_local_ppt(topic: str, *, profile: dict | None = None, extra: str = "") -> dict[str, Any]:
+    """使用固定教学模板生成本地 .pptx 文件，并带入当前画像和对话上下文。"""
     topic = (topic or "学习主题").strip()[:80]
+    context = _context_items(profile, extra)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -123,7 +143,7 @@ def generate_local_ppt(topic: str, *, extra: str = "") -> dict[str, Any]:
     circle = slide.shapes.add_shape(9, Inches(10.4), Inches(0.8), Inches(2.0), Inches(2.0))
     circle.fill.solid(); circle.fill.fore_color.rgb = CORAL; circle.line.fill.background()
 
-    for number, (title, bullets, callout) in enumerate(_build_outline(topic), start=2):
+    for number, (title, bullets, callout) in enumerate(_build_outline(topic, context), start=2):
         slide = prs.slides.add_slide(blank)
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = WHITE
@@ -136,6 +156,7 @@ def generate_local_ppt(topic: str, *, extra: str = "") -> dict[str, Any]:
     prs.save(path)
     return {
         "topic": topic,
+        "context_items": context,
         "ppt_path": str(path),
         "filename": filename,
         "status": "completed",

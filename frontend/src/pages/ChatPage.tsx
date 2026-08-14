@@ -81,7 +81,6 @@ function SideChatPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     let cancelled = false;
     api.getMessages(conversationId).then((rows) => {
@@ -203,6 +202,8 @@ export default function ChatPage() {
   const [sideModel, setSideModel] = useState<ChatModel | undefined>();
   const [termDialog, setTermDialog] = useState<{ term: ChatTerm; context: string; model?: ChatModel; branchId?: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 首条消息创建新会话时，onMeta 会更新 convId；跳过这一次历史拉取，避免覆盖正在流式生成的本地消息。
+  const skipHistoryLoadForRef = useRef<number | null>(null);
 
   // 拉取当前对话的历史消息（convId 变化时）
   useEffect(() => {
@@ -211,6 +212,10 @@ export default function ChatPage() {
     setTermDialog(null);
     if (!convId) {
       setMessages([]);
+      return;
+    }
+    if (skipHistoryLoadForRef.current === convId) {
+      skipHistoryLoadForRef.current = null;
       return;
     }
     let cancelled = false;
@@ -224,7 +229,9 @@ export default function ChatPage() {
           modelId: m.meta?.model_id || undefined,
         }))
       );
-    }).catch(() => setMessages([]));
+    }).catch(() => {
+      if (!cancelled) setMessages([]);
+    });
     return () => { cancelled = true; };
   }, [convId]);
 
@@ -269,6 +276,7 @@ export default function ChatPage() {
         {
           onMeta: (d) => {
             if (d.conversation_id) {
+              skipHistoryLoadForRef.current = d.conversation_id;
               setConvId(d.conversation_id);
               bumpConversations();
             }

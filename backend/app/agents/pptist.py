@@ -20,4 +20,4 @@ class PPTistAgent(BaseAgent):
         extra: str = "",
     ) -> dict[str, Any]:
         # python-pptx 是同步库，放到线程中避免阻塞异步请求。
-        return await asyncio.to_thread(generate_local_ppt, topic, extra=extra)
+        return await asyncio.to_thread(generate_local_ppt, topic, profile=profile, extra=extra)

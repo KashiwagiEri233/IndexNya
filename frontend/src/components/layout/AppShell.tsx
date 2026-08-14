@@ -160,11 +160,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {conversationRows.map(({ conversation: c, depth }) => (
               <div
                 key={c.id}
-                className={cn(
-                  "group flex items-center rounded-2xl transition-colors",
-                  depth > 0 ? "ml-4 w-[calc(100%-1rem)] border-l border-claude-border/80 pl-2" : "w-full"
-                )}
+                style={depth > 0 ? { marginLeft: `${depth * 16}px`, width: `calc(100% - ${depth * 16}px)` } : undefined}
+                className="group relative flex items-center rounded-2xl transition-colors"
               >
+                {depth > 0 && (
+                  <>
+                    <span className="pointer-events-none absolute -left-3 top-0 h-1/2 w-3 border-l border-b border-claude-border/90" />
+                    <span className="pointer-events-none absolute -left-3 top-1/2 text-[10px] font-bold leading-none text-island-lavender">└─</span>
+                  </>
+                )}
                 <button
                   onClick={() => switchConversation(c.id)}
                   className={cn(

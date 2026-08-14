@@ -37,34 +37,50 @@ function escapeRegExp(value: string) {
 }
 
 /**
- * 把普通 Markdown 文本中的术语转换成临时锚点链接。
- * ReactMarkdown v9 不会稳定调用 components.text，所以通过 a renderer 转成按钮。
+ * 在 Markdown AST 的 text 节点中插入 link 节点，再由 a renderer 转成按钮。
+ * 直接替换原始 Markdown 文本会破坏 **粗体**、列表和链接语法。
  */
-function decorateTerms(markdown: string, terms: ChatTerm[], onTermClick?: (term: ChatTerm) => void) {
-  if (!onTermClick || terms.length === 0) return markdown;
-  const validTerms = terms
+function remarkTerms(options: { terms: ChatTerm[] }) {
+  const terms = [...(options.terms || [])]
     .filter((term) => term.text.trim())
     .sort((a, b) => b.text.length - a.text.length);
-  if (validTerms.length === 0) return markdown;
+  if (terms.length === 0) return () => undefined;
+  const pattern = new RegExp(terms.map((term) => escapeRegExp(term.text)).join("|"), "g");
 
-  const pattern = new RegExp(validTerms.map((term) => escapeRegExp(term.text)).join("|"), "g");
-  const decorateLine = (line: string) => {
-    // 保留行内代码，不在代码片段中添加可点击标记。
-    const chunks = line.split(/(`+[^`]*`+)/g);
-    return chunks.map((chunk, index) => {
-      if (index % 2 === 1) return chunk;
-      return chunk.replace(pattern, (match) => `[${match}](#term-${encodeURIComponent(match)})`);
-    }).join("");
-  };
-
-  let fenced = false;
-  return markdown.split("\n").map((line) => {
-    if (/^\s*(```|~~~)/.test(line)) {
-      fenced = !fenced;
-      return line;
+  return (tree: any) => {
+    function walk(node: any) {
+      if (!node.children || node.type === "link" || node.type === "linkReference" || node.type === "code" || node.type === "inlineCode") return;
+      const next: any[] = [];
+      for (const child of node.children) {
+        if (child.type !== "text") {
+          walk(child);
+          next.push(child);
+          continue;
+        }
+        let lastIndex = 0;
+        let matched = false;
+        for (const match of child.value.matchAll(pattern)) {
+          const text = match[0];
+          const index = match.index ?? 0;
+          matched = true;
+          if (index > lastIndex) next.push({ type: "text", value: child.value.slice(lastIndex, index) });
+          next.push({
+            type: "link",
+            url: `#term-${encodeURIComponent(text)}`,
+            children: [{ type: "text", value: text }],
+          });
+          lastIndex = index + text.length;
+        }
+        if (!matched) {
+          next.push(child);
+        } else if (lastIndex < child.value.length) {
+          next.push({ type: "text", value: child.value.slice(lastIndex) });
+        }
+      }
+      node.children = next;
     }
-    return fenced ? line : decorateLine(line);
-  }).join("\n");
+    walk(tree);
+  };
 }
 
 export function Markdown({
@@ -76,11 +92,10 @@ export function Markdown({
   terms?: ChatTerm[];
   onTermClick?: (term: ChatTerm) => void;
 }) {
-  const decoratedMarkdown = decorateTerms(children, terms, onTermClick);
   return (
     <div className="prose-claude">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, [remarkTerms as any, { terms }]]}
         rehypePlugins={[rehypeKatex]}
         components={{
           code({ inline, className, children: c, ...props }: any) {
@@ -113,7 +128,7 @@ export function Markdown({
           },
         }}
       >
-        {decoratedMarkdown}
+        {children}
       </ReactMarkdown>
     </div>
   );
