@@ -12,9 +12,11 @@ Requires-Dist: openai>=1.30
 Requires-Dist: httpx>=0.27
 Requires-Dist: websockets>=12.0
 Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: python-pptx>=0.6.23
 Requires-Dist: python-dotenv>=1.0
 Requires-Dist: sse-starlette>=2.1
 Requires-Dist: markdown>=3.6
+Requires-Dist: pypdf>=4.0
 Requires-Dist: weasyprint>=62; sys_platform != "darwin" or platform_machine == "arm64"
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"

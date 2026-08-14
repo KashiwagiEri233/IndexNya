@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime
 from typing import Any, AsyncIterator
 from urllib.parse import quote
 
@@ -21,15 +22,21 @@ from sqlalchemy.orm import Session
 
 from ..agents.base import BaseAgent
 from ..agents.main_agent import MainAgent
-from ..llm.factory import chat_complete, get_llm, json_complete, reset_active_model, set_active_model
+from ..agents.terms import extract_terms
+from ..llm.factory import chat_complete, get_llm, reset_active_model, set_active_model
 from ..db import get_db
-from ..models import Conversation, Message, Resource, Student
-from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest
+from ..models import Conversation, ExploreCard, Message, Student
+from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest, MessageUpdate
+from ..services.conversation_service import (
+    branch_conversation as create_branch_conversation,
+    delete_conversation_tree,
+)
 from ..services.profile_service import (
     extract_profile_from_history,
     get_latest_profile,
     profile_to_dict,
 )
+from ..services.universe_service import get_anchor_context
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,60 +70,6 @@ def _friendly_model_test_error(error: Exception) -> str:
     if len(raw) > 360:
         return raw[:360].rstrip() + "…"
     return raw or "未知连接错误"
-
-
-async def _extract_terms(answer: str) -> list[dict[str, str]]:
-    """从回答中提取可点击的专有名词，失败时返回空列表。"""
-    if len(answer.strip()) < 24:
-        return []
-    sample = answer[:8000]
-    prompt = f"""请从下面这段学习助手回答中提取适合学生点击追问的专有名词。
-
-要求：
-1. 只提取技术名词、学科概念、实体名称、方法/框架/协议名称，不要提取普通动词、形容词或泛化词。
-2. text 必须是回答中原样出现的连续短语，不能改写。
-3. 最多提取 10 个，优先选择最值得展开解释的词。
-4. explanation 用一句中文简要解释这个词，方便子对话展示。
-5. 如果没有合适的词，返回空数组。
-
-只输出 JSON 数组，格式如下：
-[{{"text":"虚拟 DOM","explanation":"用于描述界面结构并优化更新过程的内存表示"}}]
-
-回答内容：
-{sample}"""
-    try:
-        raw = await json_complete([
-            {"role": "system", "content": "你是一个严谨的学习内容术语标注器。"},
-            {"role": "user", "content": prompt},
-        ], temperature=0.1, max_tokens=1200)
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        data: Any = json.loads(cleaned)
-        if isinstance(data, dict):
-            data = data.get("terms", [])
-        if not isinstance(data, list):
-            return []
-
-        terms: list[dict[str, str]] = []
-        seen: set[str] = set()
-        for item in data:
-            if not isinstance(item, dict):
-                continue
-            text = str(item.get("text") or "").strip()
-            explanation = str(item.get("explanation") or "").strip()
-            if not text or text in seen or len(text) > 48 or text not in answer:
-                continue
-            if len(explanation) > 180:
-                explanation = explanation[:180].rstrip() + "…"
-            terms.append({"text": text, "explanation": explanation})
-            seen.add(text)
-            if len(terms) >= 10:
-                break
-        return terms
-    except Exception as exc:
-        logger.debug("term extraction skipped: %s", exc)
-        return []
 
 
 def _format_resource_preview(r) -> str:
@@ -289,7 +242,8 @@ async def _stream_chat_impl(
         try:
             from ..agents.tutor import TutorAgent
             tutor = TutorAgent()
-            result = await tutor.answer(topic, profile, modality="text")
+            anchor_ctx = get_anchor_context(db, student.id, topic)
+            result = await tutor.answer(topic, profile, context=anchor_ctx, modality="text")
             text = result.get("text", "")
             full_text_parts.append(text)
             yield _sse("token", {"text": text})
@@ -318,6 +272,9 @@ async def _stream_chat_impl(
             extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
         if payload.context:
             extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
+        anchor_ctx = get_anchor_context(db, student.id, payload.message)
+        if anchor_ctx:
+            extra_context_parts.append(anchor_ctx)
         extra_context = "\n\n".join(extra_context_parts)
         try:
             async for chunk in agent.stream(
@@ -356,7 +313,7 @@ async def _stream_chat_impl(
     # 7. 提取回答中的专有名词，供前端渲染为可点击子对话入口。
     terms: list[dict[str, str]] = []
     if action in {"chat", "tutor"}:
-        terms = await _extract_terms(full_text)
+        terms = await extract_terms(full_text)
         if terms:
             yield _sse("terms", {"terms": terms})
 
@@ -482,30 +439,8 @@ def branch_conversation(
     source = db.get(Conversation, conversation_id)
     if not source:
         raise HTTPException(404, "conversation not found")
-
     title = (payload.title if payload else None) or f"侧边：{source.title}"
-    branch = Conversation(
-        student_id=source.student_id,
-        title=title[:128],
-        parent_conversation_id=source.id,
-    )
-    db.add(branch)
-    db.flush()
-    source_messages = (
-        db.query(Message)
-        .filter(Message.conversation_id == source.id)
-        .order_by(Message.created_at.asc(), Message.id.asc())
-        .all()
-    )
-    for message in source_messages:
-        db.add(Message(
-            conversation_id=branch.id,
-            role=message.role,
-            content=message.content,
-            meta={**(message.meta or {}), "branched_from": source.id},
-        ))
-    db.commit()
-    db.refresh(branch)
+    branch = create_branch_conversation(db, conversation_id, title=title)
     return {
         "id": branch.id,
         "student_id": branch.student_id,
@@ -519,45 +454,82 @@ def branch_conversation(
 @router.delete("/conversations/{conversation_id}")
 def delete_conversation(conversation_id: int, db: Session = Depends(get_db)) -> dict:
     """删除一条对话及其所有子对话、消息；资源本身保留但解除会话关联。"""
-    root = db.get(Conversation, conversation_id)
-    if not root:
+    try:
+        ids = delete_conversation_tree(db, conversation_id)
+    except ValueError:
         raise HTTPException(404, "conversation not found")
+    return {"deleted_ids": ids}
 
-    all_conversations = (
-        db.query(Conversation)
-        .filter(Conversation.student_id == root.student_id)
-        .all()
-    )
-    parent_by_id: dict[int, int | None] = {}
-    for conversation in all_conversations:
-        parent_id = conversation.parent_conversation_id
-        # 兼容添加父子字段前创建的旧分支。
-        if parent_id is None:
-            first_message = (
-                db.query(Message)
-                .filter(Message.conversation_id == conversation.id)
-                .order_by(Message.id.asc())
-                .first()
-            )
-            parent_id = (first_message.meta or {}).get("branched_from") if first_message else None
-        parent_by_id[conversation.id] = parent_id
 
-    ids = [root.id]
-    index = 0
-    while index < len(ids):
-        ids.extend(
-            conversation_id
-            for conversation_id, parent_id in parent_by_id.items()
-            if parent_id == ids[index] and conversation_id not in ids
+@router.put("/messages/{message_id}")
+def update_message(message_id: int, payload: MessageUpdate, db: Session = Depends(get_db)) -> dict:
+    """编辑用户自己的消息（仅 user 角色），记录 edited 标记。"""
+    m = db.get(Message, message_id)
+    if not m:
+        raise HTTPException(404, "message not found")
+    if m.role != "user":
+        raise HTTPException(400, "只能编辑自己的提问消息")
+    m.content = payload.content
+    meta = dict(m.meta or {})
+    meta["edited"] = True
+    meta["edited_at"] = datetime.utcnow().isoformat()
+    m.meta = meta
+    db.commit()
+    return {
+        "id": m.id,
+        "conversation_id": m.conversation_id,
+        "role": m.role,
+        "content": m.content,
+        "meta": m.meta,
+        "created_at": m.created_at.isoformat(),
+    }
+
+
+@router.delete("/messages/{message_id}")
+def delete_message(message_id: int, scope: str = "message", db: Session = Depends(get_db)) -> dict:
+    """删除一条消息；scope=round 时连同配对的 assistant 回复一起删除。
+
+    级联删除以这些消息为来源的探索卡片（含后代卡片）。
+    """
+    m = db.get(Message, message_id)
+    if not m:
+        raise HTTPException(404, "message not found")
+
+    conv = db.get(Conversation, m.conversation_id)
+    student_id = conv.student_id if conv else None
+
+    ids = [message_id]
+    if scope == "round" and m.role == "user":
+        next_msg = (
+            db.query(Message)
+            .filter(Message.conversation_id == m.conversation_id, Message.id > message_id)
+            .order_by(Message.id.asc())
+            .first()
         )
-        index += 1
+        if next_msg and next_msg.role == "assistant":
+            ids.append(next_msg.id)
 
-    # 资源不随聊天记录删除，只解除会话关联，避免资料库内容意外丢失。
-    db.query(Resource).filter(Resource.conversation_id.in_(ids)).update(
-        {Resource.conversation_id: None}, synchronize_session=False
-    )
-    db.query(Message).filter(Message.conversation_id.in_(ids)).delete(synchronize_session=False)
-    db.query(Conversation).filter(Conversation.id.in_(ids)).delete(synchronize_session=False)
+    # 级联删除来源消息命中的探索卡片及其全部后代
+    cards = db.query(ExploreCard).filter(ExploreCard.source_message_id.in_(ids)).all()
+    card_ids = [c.id for c in cards]
+    if card_ids and student_id:
+        all_cards = (
+            db.query(ExploreCard)
+            .filter(ExploreCard.student_id == student_id)
+            .all()
+        )
+        parent_by_id = {c.id: c.parent_card_id for c in all_cards}
+        descendants = set(card_ids)
+        frontier = list(card_ids)
+        while frontier:
+            current = frontier.pop()
+            for child_id, parent_id in parent_by_id.items():
+                if parent_id == current and child_id not in descendants:
+                    descendants.add(child_id)
+                    frontier.append(child_id)
+        db.query(ExploreCard).filter(ExploreCard.id.in_(list(descendants))).delete(synchronize_session=False)
+
+    db.query(Message).filter(Message.id.in_(ids)).delete(synchronize_session=False)
     db.commit()
     return {"deleted_ids": ids}
 

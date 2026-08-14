@@ -1,7 +1,10 @@
 .env
 *.pyc
 __pycache__/
+.pytest_cache/
 .venv/
+.venv-site/
+.pip-tmp/
 venv/
 *.db
 *.db-journal

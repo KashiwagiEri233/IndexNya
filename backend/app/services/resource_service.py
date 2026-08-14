@@ -69,6 +69,12 @@ async def generate_resource(
     else:
         extra_str = str(extra_dict) if extra_dict else ""
 
+    # 注入思维宇宙知识锚点（学生已用自己的话掌握的相关理解）
+    from .universe_service import get_anchor_context
+    anchor_ctx = get_anchor_context(db, student_id, topic)
+    if anchor_ctx:
+        extra_str = (extra_str + "\n\n" + anchor_ctx) if extra_str else anchor_ctx
+
     # 先建一个 pending 记录
     r = Resource(
         student_id=student_id,

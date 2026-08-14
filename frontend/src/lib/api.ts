@@ -37,6 +37,8 @@ export interface ChatModel {
 export interface ChatTerm {
   text: string;
   explanation?: string;
+  /** background=理解所需背景知识（点开默认子卡片）；related=横向对比概念（默认关联卡片） */
+  relation?: "background" | "related";
 }
 
 export interface Conversation {
@@ -84,6 +86,80 @@ export interface AssessmentDashboard {
   total_score: number;
   recommendation: string;
   raw_stats?: Record<string, any>;
+}
+
+/** 探索卡片（层级对话） */
+export type ExploreMode = "child" | "related" | "branch";
+
+export interface CardRow {
+  id: number;
+  student_id: number;
+  conversation_id: number | null;
+  parent_card_id: number | null;
+  source_message_id: number | null;
+  type: ExploreMode;
+  term: string;
+  context: string;
+  branch_conversation_id: number | null;
+  content?: {
+    question?: string;
+    messages?: { role: string; content: string; terms?: ChatTerm[] }[];
+  } | null;
+  status: string;
+  created_at: string;
+}
+
+export type ModelPayload = { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: string };
+
+export interface ExploreCardPayload {
+  student_id: number;
+  term: string;
+  explanation?: string;
+  context?: string;
+  mode: ExploreMode;
+  conversation_id?: number;
+  source_message_id?: number;
+  parent_card_id?: number;
+  card_id?: number;
+  seed_message?: string;
+  model?: ModelPayload;
+}
+
+export interface Literature {
+  id: number;
+  student_id: number;
+  title: string;
+  source_type: string;
+  terms: ChatTerm[];
+  created_at: string;
+}
+
+export interface LiteratureDetail extends Literature {
+  text: string;
+}
+
+export interface Understanding {
+  id: number;
+  student_id: number;
+  concept: string;
+  summary: string;
+  ai_score: number;
+  ai_feedback: string;
+  anchors: { concept: string; summary: string }[];
+  created_at: string;
+}
+
+export interface UniverseGraph {
+  nodes: { id: string; concept: string; summary: string; score: number; size: number }[];
+  links: { source: string; target: string; weight: number }[];
+}
+
+export interface AnchorItem {
+  id: number;
+  concept: string;
+  summary: string;
+  score: number;
+  similarity: number;
 }
 
 async function j<T>(resp: Response): Promise<T> {
@@ -360,5 +436,181 @@ export const api = {
         }
       }
     }
+  },
+
+  /** SSE 流式生成一张探索卡片（层级对话）。 */
+  async exploreCard(
+    payload: ExploreCardPayload,
+    handlers: {
+      onMeta?: (d: any) => void;
+      onToken?: (t: string) => void;
+      onTerms?: (d: any) => void;
+      onDone?: (d: any) => void;
+      onError?: (m: string) => void;
+    },
+    signal?: AbortSignal
+  ) {
+    const resp = await fetch(`${API_BASE}/hierarchy/explore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+    if (!resp.ok || !resp.body) {
+      if (resp.status === 404) {
+        throw new Error("后端接口不存在（/api/hierarchy/explore）。请确认后端已更新到最新代码并重启服务（Ctrl+C 后重新 ./start.sh）。");
+      }
+      throw new Error(`explore failed: ${resp.status}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const events = buf.split("\n\n");
+      buf = events.pop() || "";
+      for (const ev of events) {
+        const lines = ev.split("\n");
+        let event = "message";
+        let data = "";
+        for (const ln of lines) {
+          if (ln.startsWith("event:")) event = ln.slice(6).trim();
+          else if (ln.startsWith("data:")) data += ln.slice(5).trim();
+        }
+        if (!data) continue;
+        let parsed: any;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          continue;
+        }
+        switch (event) {
+          case "meta":
+            handlers.onMeta?.(parsed);
+            break;
+          case "token":
+            handlers.onToken?.(parsed.text);
+            break;
+          case "terms":
+            handlers.onTerms?.(parsed);
+            break;
+          case "done":
+            handlers.onDone?.(parsed);
+            break;
+          case "error":
+            handlers.onError?.(parsed.message);
+            break;
+        }
+      }
+    }
+  },
+
+  // ===== 探索卡片（卡片树） =====
+  async listCards(studentId: number) {
+    return j<CardRow[]>(await fetch(`${API_BASE}/hierarchy/cards?student_id=${studentId}`));
+  },
+
+  async deleteCard(cardId: number) {
+    return j<{ deleted_ids: number[] }>(
+      await fetch(`${API_BASE}/hierarchy/cards/${cardId}`, { method: "DELETE" })
+    );
+  },
+
+  // ===== 消息编辑 / 删除 =====
+  async updateMessage(messageId: number, content: string) {
+    return j<Message>(
+      await fetch(`${API_BASE}/messages/${messageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      })
+    );
+  },
+
+  async deleteMessage(messageId: number, scope: "message" | "round" = "round") {
+    return j<{ deleted_ids: number[] }>(
+      await fetch(`${API_BASE}/messages/${messageId}?scope=${scope}`, { method: "DELETE" })
+    );
+  },
+
+  // ===== 文献导入 =====
+  async uploadLiterature(studentId: number, file: File) {
+    const form = new FormData();
+    form.append("student_id", String(studentId));
+    form.append("file", file);
+    const resp = await fetch(`${API_BASE}/literature/upload`, { method: "POST", body: form });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`upload failed: ${resp.status} ${t}`);
+    }
+    return resp.json() as Promise<Literature>;
+  },
+
+  async extractLiteratureTerms(literatureId: number, model?: ModelPayload) {
+    return j<Literature>(
+      await fetch(`${API_BASE}/literature/${literatureId}/terms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(model ? { model } : {}),
+      })
+    );
+  },
+
+  async listLiteratures(studentId: number) {
+    return j<Literature[]>(await fetch(`${API_BASE}/literature?student_id=${studentId}`));
+  },
+
+  async getLiterature(literatureId: number) {
+    return j<LiteratureDetail>(await fetch(`${API_BASE}/literature/${literatureId}`));
+  },
+
+  async deleteLiterature(literatureId: number) {
+    return j<{ id: number; status: string }>(
+      await fetch(`${API_BASE}/literature/${literatureId}`, { method: "DELETE" })
+    );
+  },
+
+  // ===== 思维宇宙 =====
+  async evaluateUnderstanding(payload: {
+    student_id: number;
+    concept: string;
+    summary: string;
+    model?: ModelPayload;
+  }) {
+    return j<{
+      approved: boolean;
+      score: number;
+      feedback: string;
+      missing: string[];
+      understanding?: Understanding;
+    }>(
+      await fetch(`${API_BASE}/universe/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+    );
+  },
+
+  async getUniverse(studentId: number) {
+    return j<Understanding[]>(await fetch(`${API_BASE}/universe/${studentId}`));
+  },
+
+  async getUniverseGraph(studentId: number) {
+    return j<UniverseGraph>(await fetch(`${API_BASE}/universe/${studentId}/graph`));
+  },
+
+  async getAnchors(studentId: number, topic: string) {
+    return j<{ topic: string; anchors: AnchorItem[] }>(
+      await fetch(`${API_BASE}/universe/${studentId}/anchors?topic=${encodeURIComponent(topic)}`)
+    );
+  },
+
+  async deleteUnderstanding(understandingId: number) {
+    return j<{ id: number; status: string }>(
+      await fetch(`${API_BASE}/universe/${understandingId}`, { method: "DELETE" })
+    );
   },
 };

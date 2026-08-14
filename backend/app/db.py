@@ -33,12 +33,20 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
 
     # 轻量迁移：项目没有引入 Alembic，兼容已经存在的 SQLite 数据库。
-    columns = {column["name"] for column in inspect(engine).get_columns("conversations")}
-    if "parent_conversation_id" not in columns:
-        with engine.begin() as connection:
-            connection.execute(
-                text("ALTER TABLE conversations ADD COLUMN parent_conversation_id INTEGER REFERENCES conversations(id)")
-            )
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "conversations" in tables:
+        columns = {column["name"] for column in inspector.get_columns("conversations")}
+        if "parent_conversation_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE conversations ADD COLUMN parent_conversation_id INTEGER REFERENCES conversations(id)")
+                )
+    if "explore_cards" in tables:
+        columns = {column["name"] for column in inspector.get_columns("explore_cards")}
+        if "content" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE explore_cards ADD COLUMN content JSON"))
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -177,3 +177,99 @@ class HealthOut(BaseModel):
     status: str
     app_name: str
     llm_ready: bool
+
+
+# ===== 层级对话（探索卡片） =====
+class ExploreRequest(BaseModel):
+    """打开/重新生成一张探索卡片。
+
+    mode: child(深挖背景) / related(横向对比) / branch(继承上下文的分支对话)
+    card_id: 重开已有卡片时传入，复用该行而非新建
+    """
+    student_id: int
+    term: str
+    explanation: Optional[str] = None
+    context: str = ""
+    mode: str = "child"
+    conversation_id: Optional[int] = None
+    source_message_id: Optional[int] = None
+    parent_card_id: Optional[int] = None
+    card_id: Optional[int] = None
+    seed_message: Optional[str] = None
+    model: Optional[ChatModelConfig] = None
+
+
+class CardOut(BaseModel):
+    id: int
+    student_id: int
+    conversation_id: Optional[int] = None
+    parent_card_id: Optional[int] = None
+    source_message_id: Optional[int] = None
+    type: str
+    term: str
+    context: str = ""
+    branch_conversation_id: Optional[int] = None
+    content: Optional[dict[str, Any]] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ===== 消息编辑 / 删除 =====
+class MessageUpdate(BaseModel):
+    content: str = Field(min_length=1, max_length=20000)
+
+
+# ===== 文献 =====
+class LiteratureTermsRequest(BaseModel):
+    model: Optional[ChatModelConfig] = None
+
+
+class LiteratureOut(BaseModel):
+    id: int
+    student_id: int
+    title: str
+    source_type: str
+    terms: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LiteratureDetailOut(LiteratureOut):
+    text: str = ""
+
+
+# ===== 思维宇宙 =====
+class EvaluateRequest(BaseModel):
+    student_id: int
+    concept: str = Field(min_length=1, max_length=128)
+    summary: str = Field(min_length=1, max_length=20000)
+    model: Optional[ChatModelConfig] = None
+
+
+class UnderstandingOut(BaseModel):
+    id: int
+    student_id: int
+    concept: str
+    summary: str
+    ai_score: float
+    ai_feedback: str
+    anchors: list = Field(default_factory=list)
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UniverseGraphOut(BaseModel):
+    nodes: list[dict[str, Any]]
+    links: list[dict[str, Any]]
+
+
+class AnchorOut(BaseModel):
+    topic: str
+    anchors: list[dict[str, Any]]

@@ -95,3 +95,15 @@
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(104, 170, 167, .28); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(104, 170, 167, .48); }
+
+/* 探索卡片滑入 / 滑出动画（层级对话） */
+@keyframes explore-card-in {
+  from { opacity: 0; transform: translateX(32px) scale(0.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes explore-card-out {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to { opacity: 0; transform: translateX(32px) scale(0.97); }
+}
+.explore-card-in { animation: explore-card-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.explore-card-out { animation: explore-card-out 0.2s ease-in both; }

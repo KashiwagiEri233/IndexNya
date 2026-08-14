@@ -7,6 +7,8 @@ import ResourcesPage from "@/pages/ResourcesPage";
 import PathPage from "@/pages/PathPage";
 import DashboardPage from "@/pages/DashboardPage";
 import SettingsPage from "@/pages/SettingsPage";
+import LiteraturePage from "@/pages/LiteraturePage";
+import UniversePage from "@/pages/UniversePage";
 import { useAppStore } from "@/stores/app";
 
 export default function App() {
@@ -23,6 +25,8 @@ export default function App() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/literature" element={<LiteraturePage />} />
+        <Route path="/universe" element={<UniversePage />} />
         <Route path="/path" element={<PathPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/settings" element={<SettingsPage />} />

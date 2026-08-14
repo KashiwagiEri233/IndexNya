@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "sse-starlette>=2.1",
     "markdown>=3.6",
+    "pypdf>=4.0",
     "weasyprint>=62 ; sys_platform != 'darwin' or platform_machine == 'arm64'",
 ]
 

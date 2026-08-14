@@ -139,3 +139,59 @@ class Assessment(Base):
     score: Mapped[float] = mapped_column(Float, default=0.0)
     evidence: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ExploreCard(Base):
+    """层级对话探索卡片 — 挂在对话/消息上的卡片树节点。
+
+    type: child(子卡片/深挖背景) / related(关联卡片/横向对比) / branch(分支卡片/继承上下文另起炉灶)
+    卡片结构与生成内容（content）持久化：关闭后重开可恢复先前的回复。
+    """
+
+    __tablename__ = "explore_cards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+    conversation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+    parent_card_id: Mapped[Optional[int]] = mapped_column(ForeignKey("explore_cards.id"), nullable=True)
+    source_message_id: Mapped[Optional[int]] = mapped_column(ForeignKey("messages.id"), nullable=True)
+    type: Mapped[str] = mapped_column(String(16))  # child/related/branch
+    term: Mapped[str] = mapped_column(String(128))
+    context: Mapped[str] = mapped_column(Text, default="")  # 来源上下文快照，重开卡片时使用
+    branch_conversation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+    content: Mapped[Optional[dict]] = mapped_column(JSON, default=None)  # {"question", "messages":[{role,content,terms}]}
+    status: Mapped[str] = mapped_column(String(16), default="completed")  # processing/completed/failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Literature(Base):
+    """导入的文献 — 正文 + 抽取出的可点击术语。"""
+
+    __tablename__ = "literatures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+    title: Mapped[str] = mapped_column(String(256))
+    source_type: Mapped[str] = mapped_column(String(16))  # pdf/txt/md
+    text: Mapped[str] = mapped_column(Text, default="")
+    terms: Mapped[list] = mapped_column(JSON, default=list)  # [{text, explanation, relation}]
+    meta: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Understanding(Base):
+    """思维宇宙 — 学生用自己的话表达、经 AI 认可后沉淀的理解。"""
+
+    __tablename__ = "understandings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+    concept: Mapped[str] = mapped_column(String(128))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    ai_score: Mapped[float] = mapped_column(Float, default=0.0)
+    ai_feedback: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="approved")
+    embedding: Mapped[Optional[list]] = mapped_column(JSON, default=list)  # 本地确定性向量，相似度/图/锚点统一空间
+    anchors: Mapped[list] = mapped_column(JSON, default=list)  # 相关联的已掌握概念名
+    source: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

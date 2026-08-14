@@ -1,8 +1,29 @@
-/** 全局状态 — 当前学生 / 当前对话 / 资源刷新信号。 */
+/** 全局状态 — 当前学生 / 当前对话 / 资源刷新信号 / 探索卡片坞。 */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatModel, Student } from "@/lib/api";
+import type { ChatModel, ChatTerm, ExploreMode, Student } from "@/lib/api";
 import { api } from "@/lib/api";
+
+/** 一张打开的探索卡片（层级对话）。 */
+export interface ExploreCardState {
+  key: string;
+  cardId?: number;
+  term: string;
+  explanation?: string;
+  context: string;
+  mode: ExploreMode;
+  conversationId?: number;
+  branchConversationId?: number;
+  sourceMessageId?: number;
+  parentCardId?: number;
+  parentKey?: string;
+  modelId?: string;
+  status: "pending" | "opening" | "streaming" | "done" | "error";
+  messages: { role: "user" | "assistant"; content: string; streaming?: boolean; terms?: ChatTerm[] }[];
+  error?: string;
+  /** 关闭动画进行中 */
+  closing?: boolean;
+}
 
 interface AppState {
   student: Student | null;
@@ -31,6 +52,24 @@ interface AppState {
   bumpPath: () => void;
   conversationVersion: number;
   bumpConversations: () => void;
+  cardVersion: number;
+  bumpCards: () => void;
+  literatureVersion: number;
+  bumpLiteratures: () => void;
+  universeVersion: number;
+  bumpUniverse: () => void;
+
+  // 从对话带入思维宇宙的候选理解（跨页传递，不持久化）
+  pendingInsight: { concept: string; summary: string } | null;
+  setPendingInsight: (v: { concept: string; summary: string } | null) => void;
+
+  // 探索卡片坞（层级对话）
+  exploreCards: ExploreCardState[];
+  exploreAdd: (card: ExploreCardState) => void;
+  explorePatch: (key: string, patch: Partial<ExploreCardState>) => void;
+  exploreRemove: (key: string) => void;
+  exploreClose: (key: string) => void;
+  exploreCloseAll: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -82,6 +121,40 @@ export const useAppStore = create<AppState>()(
       bumpPath: () => set({ pathVersion: Date.now() }),
       conversationVersion: 0,
       bumpConversations: () => set({ conversationVersion: Date.now() }),
+      cardVersion: 0,
+      bumpCards: () => set({ cardVersion: Date.now() }),
+      literatureVersion: 0,
+      bumpLiteratures: () => set({ literatureVersion: Date.now() }),
+      universeVersion: 0,
+      bumpUniverse: () => set({ universeVersion: Date.now() }),
+
+      pendingInsight: null,
+      setPendingInsight: (v) => set({ pendingInsight: v }),
+
+      exploreCards: [],
+      exploreAdd: (card) => set((state) => ({ exploreCards: [...state.exploreCards, card] })),
+      explorePatch: (key, patch) => set((state) => ({
+        exploreCards: state.exploreCards.map((c) => (c.key === key ? { ...c, ...patch } : c)),
+      })),
+      exploreRemove: (key) => set((state) => ({
+        exploreCards: state.exploreCards.filter((c) => c.key !== key),
+      })),
+      exploreClose: (key) => {
+        set((state) => ({
+          exploreCards: state.exploreCards.map((c) => (c.key === key ? { ...c, closing: true } : c)),
+        }));
+        setTimeout(() => {
+          get().exploreRemove(key);
+        }, 200);
+      },
+      exploreCloseAll: () => {
+        set((state) => ({
+          exploreCards: state.exploreCards.map((c) => ({ ...c, closing: true })),
+        }));
+        setTimeout(() => {
+          set({ exploreCards: [] });
+        }, 200);
+      },
     }),
     {
       name: "learning-agent-store",

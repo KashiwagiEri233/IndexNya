@@ -19,9 +19,14 @@ function MermaidBlock({ code }: { code: string }) {
       try {
         const { svg } = await mermaid.render(id.current, code);
         if (!cancelled) ref.current.innerHTML = svg;
-      } catch {
+      } catch (err: any) {
+        // 渲染失败时降级为原始代码块，保证内容可见（并附错误摘要便于理解）
         if (!cancelled && ref.current) {
-          ref.current.innerHTML = `<pre class="text-xs text-red-500">mermaid 语法错误</pre>`;
+          const message = String(err?.message || err || "未知错误").slice(0, 120);
+          ref.current.innerHTML = `<div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+            <div class="font-bold text-amber-700">图示渲染失败：${escapeHtml(message)}</div>
+            <pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded-lg bg-[#2f4144] p-2 text-[12px] text-[#f8fffd]">${escapeHtml(code)}</pre>
+          </div>`;
         }
       }
     })();
@@ -30,6 +35,14 @@ function MermaidBlock({ code }: { code: string }) {
     };
   }, [code]);
   return <div ref={ref} className="my-3 overflow-x-auto" />;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function escapeRegExp(value: string) {
