@@ -20,7 +20,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..agents.base import BaseAgent
 from ..agents.main_agent import MainAgent
 from ..agents.terms import extract_terms
 from ..llm.factory import chat_complete, get_llm, reset_active_model, set_active_model
@@ -264,9 +263,9 @@ async def _stream_chat_impl(
             full_text_parts.append(err)
             yield _sse("token", {"text": err})
     else:
-        yield _sse("progress", {"phase": "subagent", "agent": "conversation", "status": "running", "detail": "对话 subagent 正在生成回答。"})
-        # chat：默认对话流式（画像构建 + 通用回答）
-        agent = BaseAgent()
+        yield _sse("progress", {"phase": "main", "agent": "main", "status": "running", "detail": "主 Agent 正在直接生成回答。"})
+        # chat：普通对话由主 Agent 直接流式回答，不派发 conversation subagent。
+        agent = MainAgent()
         extra_context_parts: list[str] = []
         if profile:
             extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
@@ -277,16 +276,14 @@ async def _stream_chat_impl(
             extra_context_parts.append(anchor_ctx)
         extra_context = "\n\n".join(extra_context_parts)
         try:
-            async for chunk in agent.stream(
+            async for chunk in agent.stream_answer(
                 payload.message,
                 history=history,
                 extra_context=extra_context,
-                temperature=0.7,
-                max_tokens=3072,
             ):
                 full_text_parts.append(chunk)
                 yield _sse("token", {"text": chunk})
-            yield _sse("progress", {"phase": "subagent", "agent": "conversation", "status": "completed", "detail": "对话 subagent 已完成，主 Agent 即将验收。"})
+            yield _sse("progress", {"phase": "main", "agent": "main", "status": "completed", "detail": "主 Agent 已完成直接回答，准备验收。"})
         except Exception as e:
             logger.exception("chat stream failed")
             yield _sse("error", {"message": str(e)})

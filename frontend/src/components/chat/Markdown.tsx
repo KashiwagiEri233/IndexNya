@@ -6,6 +6,8 @@ import rehypeKatex from "rehype-katex";
 import mermaid from "mermaid";
 import type { ChatTerm } from "@/lib/api";
 import "katex/dist/katex.min.css";
+// KaTeX 的 mhchem 扩展，支持 \ce{H2O}、\ce{H2 + O2 -> H2O} 等化学公式。
+import "katex/dist/contrib/mhchem.mjs";
 
 mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
 
@@ -17,6 +19,7 @@ function MermaidBlock({ code }: { code: string }) {
     (async () => {
       if (!ref.current) return;
       try {
+        await mermaid.parse(code);
         const { svg } = await mermaid.render(id.current, code);
         if (!cancelled) ref.current.innerHTML = svg;
       } catch (err: any) {
@@ -51,6 +54,8 @@ function escapeRegExp(value: string) {
 
 function normalizeMathDelimiters(markdown: string) {
   let normalized = markdown
+    // 裸的 \ce{...}/\pu{...} 自动包成行内公式；已经在 $...$ 内的不会重复包裹。
+    .replace(/(^|[^$])\\(ce|pu)\{([^{}\n]+)\}/g, (_match, prefix: string, command: string, expression: string) => `${prefix}$\\${command}{${expression}}$`)
     // \[ ... \] → display math
     .replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression: string) => `\n$$\n${expression.trim()}\n$$\n`)
     // \( ... \) → inline math
@@ -130,7 +135,7 @@ export function Markdown({
         components={{
           code({ inline, className, children: c, ...props }: any) {
             const text = String(c ?? "");
-            if (className === "language-mermaid" || text.startsWith("mindmap") || text.startsWith("graph")) {
+            if (className === "language-mermaid") {
               return <MermaidBlock code={text} />;
             }
             if (inline) return <code {...props}>{c}</code>;

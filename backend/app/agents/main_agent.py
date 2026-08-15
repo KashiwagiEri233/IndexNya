@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 
-from ..llm.factory import chat_complete
+from ..llm.factory import chat_complete, chat_stream
 
 
 class MainAgent:
@@ -45,9 +45,33 @@ class MainAgent:
         if plan.get("action") not in {"chat", "tutor", "resource"}:
             plan["action"] = "chat"
         plan.setdefault("topic", message[:30])
-        plan.setdefault("tasks", [{"agent": "conversation", "instruction": "回答当前学习问题"}])
+        if plan.get("action") == "chat":
+            plan["tasks"] = [{"agent": "main", "instruction": "由主 Agent 直接回答当前学习问题"}]
+        else:
+            plan.setdefault("tasks", [{"agent": "subagent", "instruction": "完成当前专门任务"}])
         plan.setdefault("acceptance", ["回答与用户问题相关", "结论清晰且没有空结果"])
         return plan
+
+
+    CONVERSATION_PROMPT = """你是 Index 学习岛的主 Agent，同时负责直接回答普通学习对话。
+请用中文、结构清晰地回答用户问题；必要时使用 Markdown、数学公式和例子。
+不要提及 Agent、路由或内部工作流程。"""
+
+    async def stream_answer(
+        self,
+        message: str,
+        history: list[dict] | None = None,
+        extra_context: str = "",
+    ):
+        """普通对话由主 Agent 直接流式回答，不创建 conversation subagent。"""
+        messages: list[dict[str, Any]] = [{"role": "system", "content": self.CONVERSATION_PROMPT}]
+        if extra_context:
+            messages.append({"role": "system", "content": extra_context})
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": message})
+        async for chunk in chat_stream(messages, temperature=0.7, max_tokens=3072):
+            yield chunk
 
     async def accept(self, plan: dict[str, Any], result: str) -> dict[str, Any]:
         """由主 Agent 验收 subagent 结果；模型不可用时使用本地兜底规则。"""
