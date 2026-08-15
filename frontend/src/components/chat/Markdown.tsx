@@ -56,18 +56,27 @@ function normalizeMathDelimiters(markdown: string) {
   let normalized = markdown
     // 裸的 \ce{...}/\pu{...} 自动包成行内公式；已经在 $...$ 内的不会重复包裹。
     .replace(/(^|[^$])\\(ce|pu)\{([^{}\n]+)\}/g, (_match, prefix: string, command: string, expression: string) => `${prefix}$\\${command}{${expression}}$`)
-    // \[ ... \] → display math
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression: string) => `\n$$\n${expression.trim()}\n$$\n`)
-    // \( ... \) → inline math
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression: string) => `$${expression.trim()}$`);
+    // \[ ... \] → display math；清理模型偶尔嵌入的多余 $。
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression: string) => `\n$$\n${expression.replace(/\$/g, "").trim()}\n$$\n`)
+    // \( ... \) → inline math；清理模型偶尔嵌入的多余 $。
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression: string) => `$${expression.replace(/\$/g, "").trim()}$`);
 
   // 兼容模型常输出的单行 [ \theta = ... ] 块公式。
   normalized = normalized.replace(/(^|\n)([ \t]*)\[([^\n]*\\[A-Za-z][^\n]*)\]([ \t]*)(?=\n|$)/g, (_match, prefix: string, indent: string, expression: string, suffix: string) => (
     `${prefix}${indent}$$\n${expression.trim()}\n${indent}$$${suffix}`
   ));
 
+  // 保护已经有 $...$ / $$...$$ 分隔符的公式，避免括号兼容规则嵌套进公式内部。
+  const mathBlocks: string[] = [];
+  normalized = normalized.replace(/\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\])+\$/g, (block) => {
+    const token = `__MATH_BLOCK_${mathBlocks.length}__`;
+    mathBlocks.push(block);
+    return token;
+  });
+
   // 兼容中文文本中的 (\alpha)、(\nabla f(\theta)) 等未加分隔符的常见写法。
   normalized = normalized.replace(/\((?=[^()\n]*\\[A-Za-z])((?:[^()\n]|\([^()\n]*\)[^()\n]*)+)\)/g, (_match, expression: string) => `$${expression.trim()}$`);
+  normalized = normalized.replace(/__MATH_BLOCK_(\d+)__/g, (_match, index: string) => mathBlocks[Number(index)]);
   return normalized;
 }
 

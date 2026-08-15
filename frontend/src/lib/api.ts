@@ -241,6 +241,12 @@ export const api = {
     return j<Resource[]>(await fetch(`${API_BASE}/resources?${q}`));
   },
 
+  async deleteResource(resourceId: number) {
+    return j<{ deleted_id: number }>(
+      await fetch(`${API_BASE}/resources/${resourceId}`, { method: "DELETE" })
+    );
+  },
+
   async generateResource(payload: {
     student_id: number;
     type: string;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Image as ImageIcon, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Presentation, Download, ExternalLink } from "lucide-react";
+import { FileText, Image as ImageIcon, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Presentation, Download, ExternalLink, Trash2 } from "lucide-react";
 import { api, type Resource } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { MindmapTree } from "@/components/resources/MindmapTree";
@@ -21,17 +21,18 @@ const TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
 
 const FILTERS = ["all", "lecture", "mindmap", "quiz", "reading", "code", "illustration", "ppt"];
 
-function ResourceCard({ r }: { r: Resource }) {
+function ResourceCard({ r, onDelete }: { r: Resource; onDelete: (resource: Resource) => void }) {
   const meta = TYPE_META[r.type] ?? { label: r.type, icon: FileText, color: "" };
   const Icon = meta.icon;
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <Icon size={18} className={cn("shrink-0", meta.color)} />
-            <CardTitle className="text-sm truncate">{r.title}</CardTitle>
+            <CardTitle className="truncate text-sm">{r.title}</CardTitle>
           </div>
+          <div className="flex shrink-0 items-center gap-1">
           {r.status === "completed" ? (
             <CheckCircle2 size={16} className="text-green-600 shrink-0" />
           ) : r.status === "failed" ? (
@@ -39,6 +40,8 @@ function ResourceCard({ r }: { r: Resource }) {
           ) : (
             <Loader2 size={16} className="animate-spin shrink-0" />
           )}
+          <button type="button" onClick={() => onDelete(r)} className="rounded-lg p-1.5 text-claude-muted hover:bg-red-50 hover:text-red-500" title="删除资源"><Trash2 size={14} /></button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="accent">{meta.label}</Badge>
@@ -137,6 +140,7 @@ function ResourceBody({ r }: { r: Resource }) {
 export default function ResourcesPage() {
   const student = useAppStore((s) => s.student);
   const resourceVersion = useAppStore((s) => s.resourceVersion);
+  const bumpResources = useAppStore((s) => s.bumpResources);
   const [filter, setFilter] = useState("all");
 
   const { data: resources, isLoading } = useQuery({
@@ -146,6 +150,16 @@ export default function ResourcesPage() {
   });
 
   const filtered = (resources ?? []).filter((r) => filter === "all" || r.type === filter);
+
+  async function deleteResource(resource: Resource) {
+    if (!window.confirm(`确定删除“${resource.title}”吗？删除后无法恢复。`)) return;
+    try {
+      await api.deleteResource(resource.id);
+      bumpResources();
+    } catch (error: any) {
+      alert(`删除资源失败：${error.message}`);
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -183,7 +197,7 @@ export default function ResourcesPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {filtered.map((r) => (
-              <ResourceCard key={r.id} r={r} />
+              <ResourceCard key={r.id} r={r} onDelete={deleteResource} />
             ))}
           </div>
         )}

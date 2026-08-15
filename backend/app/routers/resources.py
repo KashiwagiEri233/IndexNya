@@ -50,6 +50,29 @@ def get_one(resource_id: int, db: Session = Depends(get_db)) -> ResourceOut:
     return ResourceOut.model_validate(r)
 
 
+@router.delete("/{resource_id}")
+def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> dict:
+    """删除资源记录，并清理本地生成的图片/PPT文件。"""
+    from pathlib import Path
+
+    from ..models import Resource
+
+    resource = db.get(Resource, resource_id)
+    if not resource:
+        raise HTTPException(404, "resource not found")
+
+    content = resource.content or {}
+    for key in ("image_path", "ppt_path"):
+        file_path = content.get(key)
+        if file_path:
+            path = Path(file_path)
+            if path.exists() and path.is_file():
+                path.unlink()
+    db.delete(resource)
+    db.commit()
+    return {"deleted_id": resource_id}
+
+
 @router.get("/{resource_id}/file")
 def get_file(resource_id: int, db: Session = Depends(get_db)):
     """获取 illustration 资源生成的图片文件。"""

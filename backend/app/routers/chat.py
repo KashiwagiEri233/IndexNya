@@ -212,68 +212,87 @@ async def _stream_chat_impl(
     action = route.get("action", "chat")
     full_text_parts: list[str] = []
 
-    if action == "resource":
-        yield _sse("progress", {"phase": "subagent", "agent": route.get("resource_type") or "resource", "status": "running", "detail": "subagent 正在执行专门任务。"})
-        # 调资源生成智能体（非流式，生成后一次性返回 + 触发资源刷新）
-        rtype = route.get("resource_type", "lecture")
+    # 5. 主 Agent 通过通用调度器派发一次性 subagent。
+    from ..agents.scheduler import AgentContext, AgentTask, build_default_scheduler
+
+    if action in {"resource", "tutor"}:
+        task_data = (main_plan.get("tasks") or [{}])[0]
         topic = route.get("topic") or payload.message
-        yield _sse("token", {"text": f"正在调度「{rtype}」智能体生成关于「{topic}」的资源…\n\n"})
+        resource_type = route.get("resource_type") if action == "resource" else None
+        task_agent = str(task_data.get("agent") or resource_type or "tutor")
+        if task_agent in {"main", "subagent", "conversation"}:
+            task_agent = resource_type or "tutor"
+        task_kind = resource_type or "tutor"
+        task = AgentTask(
+            agent=task_agent,
+            kind=task_kind,
+            topic=topic,
+            instruction=str(task_data.get("instruction") or "完成主 Agent 分派的专门任务"),
+        )
+        yield _sse("progress", {
+            "phase": "subagent",
+            "agent": task.agent,
+            "status": "running",
+            "detail": f"{task.agent} subagent 正在执行专门任务。",
+        })
         try:
-            from ..services.resource_service import generate_resource
-            r = await generate_resource(
-                db, student.id, rtype, topic, conversation_id=conv.id,
-                image_model_config=payload.image_model.model_dump(exclude_none=True) if payload.image_model else None,
+            result = await build_default_scheduler().dispatch(
+                task,
+                AgentContext(
+                    db=db,
+                    student_id=student.id,
+                    conversation_id=conv.id,
+                    profile=profile,
+                    extra=payload.context or "",
+                    image_model_config=payload.image_model.model_dump(exclude_none=True) if payload.image_model else None,
+                ),
             )
-            preview = _format_resource_preview(r)
-            full_text_parts.append(preview)
-            yield _sse("token", {"text": preview})
-            yield _sse("resource", {"id": r.id, "type": r.type, "title": r.title, "file_url": r.file_url})
-            yield _sse("progress", {"phase": "subagent", "agent": rtype, "status": "completed", "detail": "subagent 已返回结果，主 Agent 即将验收。"})
+            if action == "resource":
+                resource = result.resource
+                preview = _format_resource_preview(resource)
+                full_text_parts.append(preview)
+                yield _sse("token", {"text": preview})
+                yield _sse("resource", {"id": resource.id, "type": resource.type, "title": resource.title, "file_url": resource.file_url})
+            else:
+                text = result.text
+                full_text_parts.append(text)
+                yield _sse("token", {"text": text})
+                video_topic = result.data.get("video_topic") or route.get("video_topic")
+                if video_topic:
+                    video_url = result.data.get("video_url")
+                    link = (
+                        f"\n\n📺 Bilibili 相关视频：[搜索「{video_topic}」]({video_url})"
+                        if video_url
+                        else _bilibili_search_markdown(video_topic)
+                    )
+                    full_text_parts.append(link)
+                    yield _sse("token", {"text": link})
+            yield _sse("progress", {
+                "phase": "subagent",
+                "agent": task.agent,
+                "status": "completed",
+                "detail": "subagent 已返回结果，主 Agent 即将验收。",
+            })
         except Exception as e:
-            logger.exception("resource generation in chat failed")
-            err = f"⚠️ 资源生成失败：{e}"
+            logger.exception("subagent dispatch failed: %s", task.agent)
+            err = f"⚠️ {task.agent} subagent 执行失败：{e}"
             full_text_parts.append(err)
             yield _sse("token", {"text": err})
-    elif action == "tutor":
-        yield _sse("progress", {"phase": "subagent", "agent": "tutor", "status": "running", "detail": "辅导 subagent 正在整理回答。"})
-        # 调辅导智能体
-        topic = route.get("topic") or payload.message
-        try:
-            from ..agents.tutor import TutorAgent
-            tutor = TutorAgent()
-            anchor_ctx = get_anchor_context(db, student.id, topic)
-            result = await tutor.answer(topic, profile, context=anchor_ctx, modality="text")
-            text = result.get("text", "")
-            full_text_parts.append(text)
-            yield _sse("token", {"text": text})
-            video_topic = result.get("video_topic") or route.get("video_topic")
-            if video_topic:
-                video_url = result.get("video_url")
-                link = (
-                    f"\n\n📺 Bilibili 相关视频：[搜索「{video_topic}」]({video_url})"
-                    if video_url
-                    else _bilibili_search_markdown(video_topic)
-                )
-                full_text_parts.append(link)
-                yield _sse("token", {"text": link})
-            yield _sse("progress", {"phase": "subagent", "agent": "tutor", "status": "completed", "detail": "辅导 subagent 已完成，主 Agent 即将验收。"})
-        except Exception as e:
-            logger.exception("tutor in chat failed")
-            err = f"⚠️ 辅导失败：{e}"
-            full_text_parts.append(err)
-            yield _sse("token", {"text": err})
+            yield _sse("progress", {
+                "phase": "subagent",
+                "agent": task.agent,
+                "status": "failed",
+                "detail": str(e),
+            })
     else:
         yield _sse("progress", {"phase": "main", "agent": "main", "status": "running", "detail": "主 Agent 正在直接生成回答。"})
-        # chat：普通对话由主 Agent 直接流式回答，不派发 conversation subagent。
+        # 普通对话由 MainAgent 直接流式回答，不派发 conversation subagent。
         agent = MainAgent()
         extra_context_parts: list[str] = []
         if profile:
             extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
         if payload.context:
             extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
-        anchor_ctx = get_anchor_context(db, student.id, payload.message)
-        if anchor_ctx:
-            extra_context_parts.append(anchor_ctx)
         extra_context = "\n\n".join(extra_context_parts)
         try:
             async for chunk in agent.stream_answer(
@@ -285,7 +304,7 @@ async def _stream_chat_impl(
                 yield _sse("token", {"text": chunk})
             yield _sse("progress", {"phase": "main", "agent": "main", "status": "completed", "detail": "主 Agent 已完成直接回答，准备验收。"})
         except Exception as e:
-            logger.exception("chat stream failed")
+            logger.exception("main agent chat stream failed")
             yield _sse("error", {"message": str(e)})
             return
 
