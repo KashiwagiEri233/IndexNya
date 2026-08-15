@@ -15,6 +15,26 @@ const MODE_META: Record<ExploreMode, { label: string; short: string; icon: strin
 
 const MODE_ORDER: ExploreMode[] = ["child", "related", "branch"];
 
+/** 卡片最小尺寸（Windows 式自由缩放，允许缩得较小） */
+const MIN_W = 220;
+const MIN_H = 150;
+/** 卡片与视口边缘的最小间距 */
+const EDGE = 8;
+
+/** 八向缩放方向（n/s/e/w + 四角），对应 Windows 窗口的调整手柄 */
+type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+const RESIZE_HANDLES: { dir: ResizeDir; className: string; cursor: string }[] = [
+  { dir: "n", className: "left-3 right-3 top-0 h-1.5", cursor: "cursor-ns-resize" },
+  { dir: "s", className: "bottom-0 left-3 right-3 h-1.5", cursor: "cursor-ns-resize" },
+  { dir: "e", className: "right-0 top-3 bottom-3 w-1.5", cursor: "cursor-ew-resize" },
+  { dir: "w", className: "left-0 top-3 bottom-3 w-1.5", cursor: "cursor-ew-resize" },
+  { dir: "ne", className: "right-0 top-0 h-3 w-3", cursor: "cursor-nesw-resize" },
+  { dir: "nw", className: "left-0 top-0 h-3 w-3", cursor: "cursor-nwse-resize" },
+  { dir: "se", className: "bottom-0 right-0 h-3 w-3", cursor: "cursor-nwse-resize" },
+  { dir: "sw", className: "bottom-0 left-0 h-3 w-3", cursor: "cursor-nesw-resize" },
+];
+
 function initialSize() {
   return {
     w: Math.min(400, window.innerWidth - 32),
@@ -37,17 +57,40 @@ export function ExploreCard({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [size, setSize] = useState(initialSize);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-  const resizeRef = useRef<{ startX: number; startY: number; originW: number; originH: number; originDragX: number } | null>(null);
+  const resizeRef = useRef<{ dir: ResizeDir; startX: number; startY: number; originW: number; originH: number; originX: number; originY: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const exploreClose = useAppStore((s) => s.exploreClose);
+  const focusCardKey = useAppStore((s) => s.focusCardKey);
   const meta = MODE_META[card.mode];
   const isPending = card.status === "pending";
+  const focused = focusCardKey === card.key;
+
+  /** 卡片锚定：right = R + x，top = T + y（与探索卡片坞的级联偏移一致） */
+  const R = 16 + depth * 24;
+  const T = 84 + depth * 26;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [card.messages]);
 
+  // —— 输入框随内容与卡片尺寸自适应（不再固定 2 行） ——
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxH = Math.max(64, Math.min(220, size.h * 0.35));
+    el.style.height = Math.min(el.scrollHeight, maxH) + "px";
+  }, [input, quote, size.h]);
+
   // —— 移动（header 拖动）：卡片以 right 锚定，水平偏移取反，保证跟随鼠标 ——
+  function clampPosition(x: number, y: number) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cx = Math.max(EDGE - R, Math.min(x, vw - EDGE - R - size.w));
+    const cy = Math.max(EDGE - T, Math.min(y, vh - EDGE - T - size.h));
+    return { x: cx, y: cy };
+  }
   function startDrag(event: React.PointerEvent<HTMLElement>) {
     if ((event.target as HTMLElement).closest("button")) return;
     dragRef.current = { startX: event.clientX, startY: event.clientY, originX: dragOffset.x, originY: dragOffset.y };
@@ -55,28 +98,62 @@ export function ExploreCard({
   }
   function moveDrag(event: React.PointerEvent<HTMLElement>) {
     if (!dragRef.current) return;
-    setDragOffset({
-      x: dragRef.current.originX - (event.clientX - dragRef.current.startX),
-      y: dragRef.current.originY + (event.clientY - dragRef.current.startY),
-    });
+    const next = clampPosition(
+      dragRef.current.originX - (event.clientX - dragRef.current.startX),
+      dragRef.current.originY + (event.clientY - dragRef.current.startY),
+    );
+    setDragOffset(next);
   }
   function endDrag() {
     dragRef.current = null;
   }
 
-  // —— 缩放（右下角拖拽）：反向补偿 right 偏移，固定左上角、右下角跟随鼠标 ——
-  function startResize(event: React.PointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    resizeRef.current = { startX: event.clientX, startY: event.clientY, originW: size.w, originH: size.h, originDragX: dragOffset.x };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+  // —— 缩放（Windows 式：四边 + 四角拖拽，任意方向自由调整） ——
+  function startResize(dir: ResizeDir) {
+    return (event: React.PointerEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resizeRef.current = {
+        dir,
+        startX: event.clientX,
+        startY: event.clientY,
+        originW: size.w,
+        originH: size.h,
+        originX: dragOffset.x,
+        originY: dragOffset.y,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    };
   }
-  function moveResize(event: React.PointerEvent<HTMLDivElement>) {
-    if (!resizeRef.current) return;
-    const nextW = Math.max(300, Math.min(resizeRef.current.originW + (event.clientX - resizeRef.current.startX), Math.min(560, window.innerWidth - 16)));
-    const nextH = Math.max(240, Math.min(resizeRef.current.originH + (event.clientY - resizeRef.current.startY), window.innerHeight - 64));
-    const nextX = resizeRef.current.originDragX - (nextW - resizeRef.current.originW);
-    setSize({ w: nextW, h: nextH });
-    setDragOffset((prev) => ({ ...prev, x: nextX }));
+  function moveResize(event: React.PointerEvent<HTMLElement>) {
+    const ref = resizeRef.current;
+    if (!ref) return;
+    const dx = event.clientX - ref.startX;
+    const dy = event.clientY - ref.startY;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let w = ref.originW;
+    let h = ref.originH;
+    if (ref.dir.includes("e")) w = ref.originW + dx;
+    if (ref.dir.includes("s")) h = ref.originH + dy;
+    if (ref.dir.includes("w")) w = ref.originW - dx;
+    if (ref.dir.includes("n")) h = ref.originH - dy;
+
+    // 尺寸钳制：最小 MIN_W/MIN_H，最大不超出视口
+    w = Math.max(MIN_W, Math.min(w, vw - EDGE * 2));
+    h = Math.max(MIN_H, Math.min(h, vh - EDGE * 2));
+    const dw = w - ref.originW;
+    const dh = h - ref.originH;
+
+    let x = ref.originX;
+    let y = ref.originY;
+    if (ref.dir.includes("e")) x = ref.originX - dw;   // 右缘拖动：左缘固定
+    if (ref.dir.includes("n")) y = ref.originY - dh;   // 上缘拖动：下缘固定
+    const next = clampPosition(x, y);
+
+    setSize({ w, h });
+    setDragOffset(next);
   }
   function endResize() {
     resizeRef.current = null;
@@ -175,17 +252,34 @@ export function ExploreCard({
   return (
     <aside
       style={{
-        right: `${16 + depth * 24 + dragOffset.x}px`,
-        top: `${84 + depth * 26 + dragOffset.y}px`,
+        right: `${R + dragOffset.x}px`,
+        top: `${T + dragOffset.y}px`,
         width: size.w,
         height: size.h,
-        zIndex: 40 + depth,
+        zIndex: focused ? 300 : 40 + depth,
       }}
       className={cn(
         "fixed flex flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island",
+        focused && "border-claude-accent ring-4 ring-claude-accent/30",
         card.closing ? "explore-card-out" : "explore-card-in"
       )}
     >
+      {/* Windows 式八向缩放手柄（隐藏热区，悬停显示光标） */}
+      {RESIZE_HANDLES.map((handle) => (
+        <div
+          key={handle.dir}
+          onPointerDown={startResize(handle.dir)}
+          onPointerMove={moveResize}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          className={cn("absolute z-30 touch-none select-none", handle.className, handle.cursor)}
+        />
+      ))}
+      {/* 右下角可见缩放把手（装饰） */}
+      <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex h-6 w-6 items-end justify-end rounded-bl-xl p-0.5 text-claude-muted/50 select-none">
+        <MoveDiagonal size={13} />
+      </div>
+
       <header
         onPointerDown={startDrag}
         onPointerMove={moveDrag}
@@ -259,7 +353,7 @@ export function ExploreCard({
         ) : (
           <>
             {card.status === "opening" && card.messages.length > 0 && (
-              <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-claude-accentSoft/60 px-2 py-1 text-[10px] font-bold text-claude-accent">
+              <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-claude-accentSoft/60 px-2 py-1 text-[10px] font-bold text-claude-accent">
                 <Loader2 size={11} className="animate-spin" /> 正在重新生成，新回答将替换下方内容…
               </div>
             )}
@@ -315,7 +409,7 @@ export function ExploreCard({
 
       {/* 底部：模式切换 + 输入区 */}
       <div className="border-t border-claude-border/70 bg-white/75 p-3">
-        <div className="mb-2 flex items-center gap-1.5">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {MODE_ORDER.map((mode) => {
             const m = MODE_META[mode];
             const active = card.mode === mode;
@@ -359,6 +453,7 @@ export function ExploreCard({
               </div>
             )}
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -367,7 +462,7 @@ export function ExploreCard({
                   void send();
                 }
               }}
-              rows={2}
+              rows={1}
               disabled={card.status === "streaming"}
               placeholder={
                 card.status === "streaming"
@@ -378,7 +473,7 @@ export function ExploreCard({
                   ? meta.placeholder
                   : `继续追问「${card.term}」…（将重新生成）`
               }
-              className="w-full resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none"
+              className="w-full resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-sm outline-none"
             />
             <div className="flex items-center justify-between border-t border-claude-border/60 px-2 py-1.5">
               <span className="max-w-[240px] truncate text-[10px] font-bold text-claude-muted">
@@ -396,18 +491,6 @@ export function ExploreCard({
             </div>
           </div>
         )}
-      </div>
-
-      {/* 右下角缩放把手 */}
-      <div
-        onPointerDown={startResize}
-        onPointerMove={moveResize}
-        onPointerUp={endResize}
-        onPointerCancel={endResize}
-        className="absolute bottom-0 right-0 z-10 flex h-6 w-6 cursor-nwse-resize touch-none items-end justify-end rounded-bl-xl p-0.5 text-claude-muted/60 select-none hover:text-claude-accent"
-        title="拖动调整卡片大小"
-      >
-        <MoveDiagonal size={13} />
       </div>
     </aside>
   );

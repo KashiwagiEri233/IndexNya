@@ -70,6 +70,9 @@ interface AppState {
   exploreRemove: (key: string) => void;
   exploreClose: (key: string) => void;
   exploreCloseAll: () => void;
+  /** 卡片树导航：聚焦某张卡片（临时高亮置顶，便于精准定位） */
+  focusCardKey: string | null;
+  exploreFocus: (key: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -154,6 +157,14 @@ export const useAppStore = create<AppState>()(
         setTimeout(() => {
           set({ exploreCards: [] });
         }, 200);
+      },
+
+      focusCardKey: null,
+      exploreFocus: (key) => {
+        set({ focusCardKey: key });
+        if (key) {
+          setTimeout(() => set({ focusCardKey: null }), 1800);
+        }
       },
     }),
     {

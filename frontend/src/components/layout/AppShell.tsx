@@ -22,6 +22,79 @@ const CARD_TYPE_META: Record<string, { icon: any; label: string; color: string }
   branch: { icon: ArrowDown, label: "分支", color: "text-island-lavender" },
 };
 
+/** 卡片树行 — 带仓库目录树风格的连线前缀（├─ / └─ / │），用于精准定位层级。 */
+interface CardTreeRow {
+  card: CardRow;
+  prefix: string;
+  isLast: boolean;
+}
+function cardTreeRows(cards: CardRow[]): CardTreeRow[] {
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const childrenOf = new Map<number | null, CardRow[]>();
+  for (const c of cards) {
+    const pid = c.parent_card_id != null && byId.has(c.parent_card_id) ? c.parent_card_id : null;
+    const arr = childrenOf.get(pid) ?? [];
+    arr.push(c);
+    childrenOf.set(pid, arr);
+  }
+  const roots = childrenOf.get(null) ?? [];
+  const rows: CardTreeRow[] = [];
+  function walk(node: CardRow, prefix: string, isLast: boolean) {
+    rows.push({ card: node, prefix, isLast });
+    const children = childrenOf.get(node.id) ?? [];
+    const childPrefix = prefix + (isLast ? "   " : "│  ");
+    children.forEach((child, index) => walk(child, childPrefix, index === children.length - 1));
+  }
+  roots.forEach((root, index) => walk(root, "", index === roots.length - 1));
+  return rows;
+}
+
+/** 渲染一棵卡片树（对话下 / 文献探索组共用）。 */
+function CardTree({
+  rows,
+  onReopen,
+  onDelete,
+}: {
+  rows: CardTreeRow[];
+  onReopen: (card: CardRow) => void;
+  onDelete: (card: CardRow) => void;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="space-y-0.5">
+      {rows.map(({ card, prefix, isLast }) => {
+        const meta = CARD_TYPE_META[card.type] ?? CARD_TYPE_META.child;
+        const Icon = meta.icon;
+        return (
+          <div key={card.id} className="group relative flex items-center rounded-xl transition-colors">
+            <span className="pointer-events-none absolute -left-2 top-0 h-1/2 w-2 border-l border-b border-claude-border/80" />
+            <button
+              onClick={() => onReopen(card)}
+              className="flex min-w-0 flex-1 items-center gap-1 py-1.5 pl-1 text-left text-[11px] font-bold text-claude-muted transition-colors hover:bg-white/75 hover:text-claude-ink"
+              title={`重开探索卡片「${card.term}」（${meta.label}）`}
+            >
+              <span className="shrink-0 whitespace-pre font-mono text-[10px] leading-4 text-claude-border">
+                {prefix}
+                {isLast ? "└─ " : "├─ "}
+              </span>
+              <Icon size={11} className={cn("shrink-0", meta.color)} />
+              <span className="truncate">{card.term}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(card)}
+              className="mr-0.5 shrink-0 rounded-md p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+              title="删除探索卡片及其后代"
+            >
+              <Trash2 size={10} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const student = useAppStore((s) => s.student);
   const studentId = student?.id;
@@ -256,34 +329,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Trash2 size={13} />
                     </button>
                   </div>
-                  {/* 该对话下的探索卡片树 */}
+                  {/* 该对话下的探索卡片树（树状图：├─ / └─ / │ 连线，精准定位层级） */}
                   {convCards.length > 0 && (
-                    <div className="mt-0.5 space-y-0.5" style={{ marginLeft: `${(depth + 1) * 16}px`, width: `calc(100% - ${(depth + 1) * 16}px)` }}>
-                      {convCards.map((card) => {
-                        const meta = CARD_TYPE_META[card.type] ?? CARD_TYPE_META.child;
-                        const Icon = meta.icon;
-                        return (
-                          <div key={card.id} className="group relative flex items-center rounded-xl transition-colors">
-                            <span className="pointer-events-none absolute -left-2 top-0 h-1/2 w-2 border-l border-b border-claude-border/80" />
-                            <button
-                              onClick={() => void reopenCard(card)}
-                              className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-1 text-left text-[11px] font-bold text-claude-muted transition-colors hover:bg-white/75 hover:text-claude-ink"
-                              title={`重开探索卡片「${card.term}」（${meta.label}）`}
-                            >
-                              <Icon size={11} className={cn("shrink-0", meta.color)} />
-                              <span className="truncate">{card.term}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void deleteCard(card)}
-                              className="mr-0.5 shrink-0 rounded-md p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                              title="删除探索卡片及其后代"
-                            >
-                              <Trash2 size={10} />
-                            </button>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-0.5" style={{ marginLeft: `${(depth + 1) * 16}px`, width: `calc(100% - ${(depth + 1) * 16}px)` }}>
+                      <CardTree rows={cardTreeRows(convCards)} onReopen={reopenCard} onDelete={deleteCard} />
                     </div>
                   )}
                 </div>
@@ -296,30 +345,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Layers size={11} /> 文献探索
                 </div>
                 <div className="space-y-0.5">
-                  {(cardsByConversation.get(null) ?? []).map((card) => {
-                    const meta = CARD_TYPE_META[card.type] ?? CARD_TYPE_META.child;
-                    const Icon = meta.icon;
-                    return (
-                      <div key={card.id} className="group relative flex items-center rounded-xl transition-colors">
-                        <button
-                          onClick={() => void reopenCard(card)}
-                          className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-1.5 text-left text-[11px] font-bold text-claude-muted transition-colors hover:bg-white/75 hover:text-claude-ink"
-                          title={`重开探索卡片「${card.term}」（${meta.label}）`}
-                        >
-                          <Icon size={11} className={cn("shrink-0", meta.color)} />
-                          <span className="truncate">{card.term}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteCard(card)}
-                          className="mr-0.5 shrink-0 rounded-md p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                          title="删除探索卡片及其后代"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
-                    );
-                  })}
+                  <CardTree rows={cardTreeRows(cardsByConversation.get(null) ?? [])} onReopen={reopenCard} onDelete={deleteCard} />
                 </div>
               </div>
             )}
