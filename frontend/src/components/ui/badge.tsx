@@ -4,14 +4,15 @@ import { cn } from "@/lib/utils";
 export const Badge = React.forwardRef<
   HTMLSpanElement,
   React.HTMLAttributes<HTMLSpanElement> & {
-    variant?: "default" | "accent" | "success" | "warn";
+    variant?: "default" | "accent" | "success" | "warn" | "error";
   }
 >(({ className, variant = "default", ...props }, ref) => {
   const variants = {
-    default: "bg-claude-panel text-claude-muted",
-    accent: "bg-claude-accentSoft text-claude-accent",
-    success: "bg-emerald-100 text-emerald-700",
-    warn: "bg-amber-100 text-amber-700",
+    default: "bg-island-panel text-island-inkSoft",
+    accent: "bg-island-accentSoft text-island-accentDeep",
+    success: "bg-island-success/15 text-island-success",
+    warn: "bg-island-warn/20 text-[#8a6010]",
+    error: "bg-island-error/10 text-island-error",
   };
   return (
     <span

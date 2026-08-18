@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { RibbonTitle } from "@/components/ui/ribbon";
 import { Markdown } from "@/components/chat/Markdown";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { ReasoningSelector } from "@/components/chat/ReasoningSelector";
@@ -62,19 +63,19 @@ function QuizCard({ quiz, onAnswer }: { quiz: NonNullable<ChatMsg["quiz"]>; onAn
   const answeredCount = session?.index ?? quiz.index ?? 0;
   const score = session?.score ?? quiz.score ?? 0;
   return (
-    <div className={cn("mt-3 rounded-2xl border p-3 shadow-soft", answered ? "border-claude-border/70 bg-claude-panel/40" : "border-island-lavender/40 bg-white")}>
+    <div className={cn("mt-3 rounded-[16px] border-2 p-3", answered ? "border-island-border bg-island-panel/40" : "border-island-lavender/40 bg-island-lavender/5")}>
       <div className="flex items-center justify-between gap-2">
-        <span className={cn("inline-flex items-center gap-1 text-xs font-bold", answered ? "text-claude-muted" : "text-island-lavender")}>
+        <span className={cn("inline-flex items-center gap-1 text-xs font-bold", answered ? "text-island-muted" : "text-island-lavender")}>
           <ClipboardCheck size={13} /> {answered ? "练习结束" : `第 ${answeredCount} 题`}
         </span>
         {answered ? (
-          <span className="text-[10px] text-claude-muted">共作答 {answeredCount} 题 · 答对 {score} 题</span>
+          <span className="text-[10px] text-island-muted">共作答 {answeredCount} 题 · 答对 {score} 题</span>
         ) : (
-          <span className="text-[10px] text-claude-muted">已答对 {score} 题</span>
+          <span className="text-[10px] text-island-muted">已答对 {score} 题</span>
         )}
       </div>
       {answered ? (
-        <p className="mt-2 text-xs text-claude-muted">本轮互动刷题已完成，批改与小结见上方消息。想继续可以再说「再来几题」。</p>
+        <p className="mt-2 text-xs text-island-muted">本轮互动刷题已完成，批改与小结见上方消息。想继续可以再说「再来几题」。</p>
       ) : (
         <>
           {quiz.options && quiz.options.length > 0 && (
@@ -84,7 +85,7 @@ function QuizCard({ quiz, onAnswer }: { quiz: NonNullable<ChatMsg["quiz"]>; onAn
                   key={i}
                   type="button"
                   onClick={() => onAnswer(`我的答案：${opt}`)}
-                  className="rounded-xl border bg-claude-panel/60 px-3 py-1.5 text-left text-xs transition-colors hover:border-island-lavender/50 hover:bg-island-lavender/10"
+                  className="rounded-[14px] border-2 border-island-border bg-island-card px-3 py-1.5 text-left text-xs font-medium transition-all duration-200 ease-island hover:-translate-y-px hover:border-island-lavender/60 hover:bg-island-lavender/10"
                 >
                   {opt}
                 </button>
@@ -92,11 +93,11 @@ function QuizCard({ quiz, onAnswer }: { quiz: NonNullable<ChatMsg["quiz"]>; onAn
             </div>
           )}
           <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-claude-muted">{quiz.options?.length ? "点选项直接作答" : "在下方输入框输入答案后回车"}</span>
+            <span className="text-[10px] text-island-muted">{quiz.options?.length ? "点选项直接作答" : "在下方输入框输入答案后回车"}</span>
             <button
               type="button"
               onClick={() => onAnswer("结束练习")}
-              className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold text-claude-muted transition-colors hover:bg-claude-panel"
+              className="shrink-0 rounded-full border-2 border-island-border px-2.5 py-0.5 text-[10px] font-bold text-island-muted transition-colors hover:bg-island-panel"
             >
               结束练习
             </button>
@@ -269,7 +270,7 @@ function SideChatPanel({
           }),
           onError: (message) => setMessages((current) => {
             const next = [...current];
-            if (next[assistantIdx]) next[assistantIdx] = { ...next[assistantIdx], content: `⚠️ ${message}`, streaming: false };
+            if (next[assistantIdx]) next[assistantIdx] = { ...next[assistantIdx], content: `出错了：${message}`, streaming: false };
             return next;
           }),
         },
@@ -277,7 +278,7 @@ function SideChatPanel({
     } catch (error: any) {
       setMessages((current) => {
         const next = [...current];
-        if (next[assistantIdx]) next[assistantIdx] = { ...next[assistantIdx], content: `⚠️ ${error.message}`, streaming: false };
+        if (next[assistantIdx]) next[assistantIdx] = { ...next[assistantIdx], content: `出错了：${error.message}`, streaming: false };
         return next;
       });
     } finally {
@@ -286,30 +287,30 @@ function SideChatPanel({
   }
 
   return (
-    <aside className="relative flex w-[min(430px,42vw)] shrink-0 flex-col border-l border-claude-border/80 bg-[#f8fcfb]">
-      <div className="flex min-h-[4.25rem] items-center justify-between border-b border-claude-border/80 px-4">
+    <aside className="relative flex w-[min(430px,42vw)] shrink-0 flex-col border-l border-island-border bg-island-content/60">
+      <div className="flex min-h-[4.25rem] items-center justify-between border-b border-island-border px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-claude-accentSoft text-claude-accent"><GitBranch size={15} /></div>
-          <div className="min-w-0"><div className="truncate text-sm font-extrabold">侧边对话</div><div className="text-[10px] text-claude-muted">基于当前上下文的独立分支</div></div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-island-lavender/25 text-[#7a3fd0]"><GitBranch size={15} /></div>
+          <div className="min-w-0"><div className="truncate text-sm font-extrabold">侧边对话</div><div className="text-[10px] text-island-muted">基于当前上下文的独立分支</div></div>
         </div>
-        <button type="button" onClick={onClose} className="rounded-full p-2 text-claude-muted hover:bg-white hover:text-claude-ink" title="关闭侧边对话"><X size={16} /></button>
+        <button type="button" onClick={onClose} className="rounded-full p-2 text-island-muted hover:bg-island-card hover:text-island-ink" title="关闭侧边对话"><X size={16} /></button>
       </div>
       <div ref={scrollRef} onMouseUp={handleSelection} onMouseDown={() => setQuoteBtn(null)} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <div className="space-y-4">
           {messages.map((message, index) => (
             <div key={index} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "")}>
-              {message.role === "assistant" && <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-claude-accent text-white"><Sparkles size={13} /></div>}
-              <div className={cn("max-w-[88%] rounded-2xl px-3 py-2 text-sm shadow-soft", message.role === "user" ? "rounded-br-md bg-claude-user" : "rounded-bl-md border bg-white")}>
+              {message.role === "assistant" && <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-island-accent text-white"><Sparkles size={13} /></div>}
+              <div className={cn("max-w-[88%] rounded-[18px] px-3 py-2 text-sm shadow-soft", message.role === "user" ? "rounded-br-md bg-island-user" : "rounded-bl-md border border-island-border bg-island-card")}>
                 {message.role === "assistant" ? (
                   message.content ? (
                     <div data-bubble="assistant">
                       <Markdown terms={message.terms} onTermClick={(term) => onTermClick(term, message.content, message.id)}>{message.content}</Markdown>
                     </div>
                   ) : (
-                    <span className="text-claude-muted">…</span>
+                    <span className="text-island-muted">…</span>
                   )
                 ) : <div className="whitespace-pre-wrap">{message.content}</div>}
-                {message.streaming && <span className="ml-1 inline-block h-4 w-1 animate-pulse align-middle bg-claude-accent" />}
+                {message.streaming && <span className="ml-1 inline-block h-4 w-1 animate-pulse align-middle bg-island-accent" />}
               </div>
             </div>
           ))}
@@ -320,7 +321,7 @@ function SideChatPanel({
       {quoteBtn && (
         <div
           style={{ left: quoteBtn.x - 84, top: quoteBtn.y }}
-          className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-white bg-white/95 p-1 shadow-island backdrop-blur"
+          className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-island-border bg-island-card/95 p-1 shadow-island backdrop-blur"
         >
           <button
             type="button"
@@ -329,7 +330,7 @@ function SideChatPanel({
               setQuoteBtn(null);
               window.getSelection()?.removeAllRanges();
             }}
-            className="flex items-center gap-1 rounded-full bg-claude-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-claude-accentHover"
+            className="flex items-center gap-1 rounded-full bg-island-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-island-accentHover"
             title="以选中内容为名词打开追问卡片"
           >
             <Search size={12} /> 追问
@@ -341,7 +342,7 @@ function SideChatPanel({
               setQuoteBtn(null);
               window.getSelection()?.removeAllRanges();
             }}
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-claude-muted transition-colors hover:bg-claude-panel hover:text-claude-ink"
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-island-muted transition-colors hover:bg-island-panel hover:text-island-ink"
             title="把选中内容作为引用带入输入框"
           >
             <QuoteIcon size={12} /> 引用
@@ -349,19 +350,19 @@ function SideChatPanel({
         </div>
       )}
 
-      <div className="border-t border-claude-border/70 bg-white/70 p-3">
+      <div className="border-t border-island-border bg-island-card/70 p-3">
         {quote && (
-          <div className="mb-2 flex items-start gap-2 rounded-xl border border-claude-accent/30 bg-claude-accentSoft/50 px-2.5 py-1.5 text-xs text-claude-ink">
-            <QuoteIcon size={12} className="mt-0.5 shrink-0 text-claude-accent" />
-            <div className="min-w-0 flex-1 line-clamp-2 whitespace-pre-wrap text-claude-muted">{quote}</div>
-            <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-0.5 text-claude-muted hover:bg-white hover:text-claude-ink" title="移除引用"><X size={12} /></button>
+          <div className="mb-2 flex items-start gap-2 rounded-[14px] border border-island-accent/30 bg-island-accentSoft/60 px-2.5 py-1.5 text-xs text-island-ink">
+            <QuoteIcon size={12} className="mt-0.5 shrink-0 text-island-accentDeep" />
+            <div className="min-w-0 flex-1 line-clamp-2 whitespace-pre-wrap text-island-muted">{quote}</div>
+            <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-0.5 text-island-muted hover:bg-island-card hover:text-island-ink" title="移除引用"><X size={12} /></button>
           </div>
         )}
-        <div className="overflow-hidden rounded-2xl border border-white bg-white shadow-soft focus-within:ring-4 focus-within:ring-claude-accent/15">
+        <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
           <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} rows={2} placeholder="在侧边分支中继续追问…" className="w-full resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none" />
-          <div className="flex items-center justify-between border-t border-claude-border/60 px-2 py-1.5">
-            <span className="max-w-[190px] truncate text-[10px] font-bold text-claude-muted">{sideEntry ? `${sideEntry.provider.name} · ${sideEntry.model.name}` : "未选择模型"}</span>
-            <button type="button" onClick={send} disabled={busy || !input.trim()} className="flex h-7 w-7 items-center justify-center rounded-full bg-claude-accent text-white disabled:opacity-40" title="发送">{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button>
+          <div className="flex items-center justify-between border-t border-island-border px-2 py-1.5">
+            <span className="max-w-[190px] truncate text-[10px] font-bold text-island-muted">{sideEntry ? `${sideEntry.provider.name} · ${sideEntry.model.name}` : "未选择模型"}</span>
+            <button type="button" onClick={send} disabled={busy || !input.trim()} className="flex h-8 w-8 items-center justify-center rounded-full bg-island-accent text-white shadow-btn-3d-teal transition-all duration-200 ease-island hover:-translate-y-px hover:bg-island-accentHover hover:shadow-btn-3d-teal-hover active:translate-y-[2px] active:shadow-btn-3d-teal-active disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none" title="发送">{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button>
           </div>
         </div>
       </div>
@@ -603,7 +604,7 @@ export default function ChatPage() {
             setMessages((m) => {
               const copy = [...m];
               if (assistantIdx >= 0 && copy[assistantIdx]) {
-                copy[assistantIdx] = { ...copy[assistantIdx], content: `⚠️ ${msg}`, streaming: false };
+                copy[assistantIdx] = { ...copy[assistantIdx], content: `出错了：${msg}`, streaming: false };
               }
               return copy;
             });
@@ -614,7 +615,7 @@ export default function ChatPage() {
       setMessages((m) => {
         const copy = [...m];
         if (assistantIdx >= 0 && copy[assistantIdx]) {
-          copy[assistantIdx] = { ...copy[assistantIdx], content: `⚠️ ${e.message}`, streaming: false };
+          copy[assistantIdx] = { ...copy[assistantIdx], content: `出错了：${e.message}`, streaming: false };
         }
         return copy;
       });
@@ -645,7 +646,7 @@ export default function ChatPage() {
       } else if (r.content?.questions) {
         preview = "题库已生成（共 " + r.content.questions.length + " 题），请在资源库查看。";
       } else if (r.content?.error) {
-        preview = `⚠️ 生成失败：${r.content.error}`;
+        preview = `出错了：生成失败：${r.content.error}`;
       } else {
         preview = "✅ 资源已生成，请在资源库查看。";
       }
@@ -657,7 +658,7 @@ export default function ChatPage() {
     } catch (e: any) {
       setMessages((m) => {
         const copy = [...m];
-        copy[assistantIdx] = { role: "assistant", content: `⚠️ 生成失败：${e.message}`, streaming: false };
+        copy[assistantIdx] = { role: "assistant", content: `出错了：生成失败：${e.message}`, streaming: false };
         return copy;
       });
     } finally {
@@ -695,7 +696,7 @@ export default function ChatPage() {
         content = `**识别内容：**\n\n${res.recognition}\n\n---\n\n**针对性解答：**\n\n${res.answer}`;
       }
       if (res.status === "failed") {
-        content = `⚠️ 图片理解失败：${res.error}`;
+        content = `出错了：图片理解失败：${res.error}`;
       }
       setMessages((m) => {
         const copy = [...m];
@@ -705,7 +706,7 @@ export default function ChatPage() {
     } catch (e: any) {
       setMessages((m) => {
         const copy = [...m];
-        copy[assistantIdx] = { role: "assistant", content: `⚠️ ${e.message}`, streaming: false };
+        copy[assistantIdx] = { role: "assistant", content: `出错了：${e.message}`, streaming: false };
         return copy;
       });
     } finally {
@@ -817,11 +818,8 @@ export default function ChatPage() {
       <div className="flex min-w-0 flex-1 flex-col">
       {/* 头部 */}
       <header className="island-header">
-        <div className="island-header-title">
-          <Sparkles size={18} className="text-claude-accent" />
-          <h1 className="font-semibold">学习对话</h1>
-        </div>
-        <button type="button" onClick={openSideConversation} disabled={!convId || !!sideConvId} className="inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-2 text-xs font-bold text-claude-muted shadow-soft transition-colors hover:border-claude-accent/40 hover:text-claude-accent disabled:cursor-not-allowed disabled:opacity-50" title="基于当前对话打开独立侧边分支">
+        <RibbonTitle color="teal" icon={<Sparkles size={14} />}>学习对话</RibbonTitle>
+        <button type="button" onClick={openSideConversation} disabled={!convId || !!sideConvId} className="btn-default h-9 px-3.5 text-xs" title="基于当前对话打开独立侧边分支">
           <PanelRight size={14} /> {sideConvId ? "侧边对话已打开" : "打开侧边对话"}
         </button>
       </header>
@@ -830,15 +828,15 @@ export default function ChatPage() {
       <div ref={scrollRef} onMouseUp={handleSelection} onMouseDown={() => setQuoteBtn(null)} className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {messages.length === 0 && (
-            <div className="island-dot-pattern animate-float-in rounded-[2rem] border border-white bg-white/55 px-5 py-16 text-center text-claude-muted shadow-soft">
-              <Sparkles size={40} className="mx-auto mb-3 text-claude-accent" />
-              <p className="text-lg font-medium text-claude-ink">开始今天的学习</p>
+            <div className="island-dot-pattern animate-float-in rounded-bubble border border-island-border bg-island-card/70 px-5 py-16 text-center text-island-muted">
+              <Sparkles size={40} className="mx-auto mb-3 text-island-accentDeep" />
+              <p className="text-lg font-extrabold text-island-ink">开始今天的学习</p>
               <p className="mt-2 text-sm">告诉我正在学什么、想弄清什么，或者直接输入一个学习目标。点击回答中的下划线术语，卡片会在旁边展开。</p>
               <div className="mt-6 grid grid-cols-3 gap-2 max-w-lg mx-auto text-left">
                 {ALL_FEATURES.map((a) => (
                   <div key={a.label} className="card p-3 text-sm">
-                    <a.icon size={16} className="text-claude-accent mb-1" />
-                    <div className="font-medium">{a.label}</div>
+                    <a.icon size={16} className="mb-1 text-island-accentDeep" />
+                    <div className="font-bold text-island-ink">{a.label}</div>
                   </div>
                 ))}
               </div>
@@ -847,30 +845,30 @@ export default function ChatPage() {
           {messages.map((m, i) => (
             <div key={i} className={cn("group relative flex gap-3 animate-fade-in", m.role === "user" ? "justify-end" : "")}>
               {m.role === "assistant" && (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-claude-accent text-white shadow-soft">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-island-accent text-white shadow-btn-3d-teal">
                   <Sparkles size={16} />
                 </div>
               )}
               <div
                 className={cn(
-                  "max-w-[80%] rounded-[1.35rem] px-4 py-3 shadow-soft",
+                  "max-w-[80%] rounded-[20px] px-4 py-3 shadow-soft",
                   m.role === "user"
-                    ? "rounded-br-md bg-claude-user text-claude-ink"
-                    : "rounded-bl-md border bg-claude-assistant"
+                    ? "rounded-br-md bg-island-user text-island-ink"
+                    : "rounded-bl-md border border-island-border bg-island-assistant"
                 )}
               >
                 {m.role === "assistant" ? (
                   <>
                     {m.progress && m.streaming && (
-                      <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-claude-panel/60 px-2 py-1 text-[11px] font-semibold text-claude-muted">
-                        <span className={cn("h-1.5 w-1.5 rounded-full", m.progress.status === "failed" ? "bg-red-400" : "bg-claude-accent animate-pulse")} />
+                      <div className="mb-2 flex items-center gap-1.5 rounded-[12px] bg-island-panel/70 px-2 py-1 text-[11px] font-semibold text-island-muted">
+                        <span className={cn("h-1.5 w-1.5 rounded-full", m.progress.status === "failed" ? "bg-island-error" : "bg-island-accent animate-pulse")} />
                         {m.progress.detail || `${m.progress.agent} 正在工作…`}
                       </div>
                     )}
                     {m.route && (
                       <div className="mb-2 flex items-center gap-1.5">
-                        <span className="text-[11px] text-claude-muted">由</span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-claude-accentSoft text-claude-accent px-2 py-0.5 text-xs font-medium">
+                        <span className="text-[11px] text-island-muted">由</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-island-accentSoft px-2 py-0.5 text-xs font-bold text-island-accentDeep">
                           {m.route.action === "resource"
                             ? ROUTE_LABELS[m.route.resource_type || ""] || `${m.route.resource_type}`
                             : m.route.action === "tutor"
@@ -881,7 +879,7 @@ export default function ChatPage() {
                             ? "互动刷题"
                             : "学习问答"}
                         </span>
-                        <span className="text-[11px] text-claude-muted">回答</span>
+                        <span className="text-[11px] text-island-muted">回答</span>
                       </div>
                     )}
                     {m.content ? (
@@ -894,7 +892,7 @@ export default function ChatPage() {
                         </Markdown>
                         {m.quiz && <QuizCard quiz={m.quiz} onAnswer={(t) => send(t)} />}
                       </div>
-                    ) : <span className="text-claude-muted">…</span>}
+                    ) : <span className="text-island-muted">…</span>}
                   </>
                 ) : editingId === m.id ? (
                   <div className="w-[min(520px,60vw)]">
@@ -903,38 +901,38 @@ export default function ChatPage() {
                       onChange={(e) => setEditText(e.target.value)}
                       rows={3}
                       autoFocus
-                      className="w-full resize-none rounded-xl border border-claude-accent/50 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-claude-accent/15"
+                      className="w-full resize-none rounded-[14px] border-2 border-island-accent/50 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-island-focus/70"
                     />
                     <div className="mt-2 flex justify-end gap-2">
-                      <button type="button" onClick={() => setEditingId(null)} className="rounded-full border px-3 py-1 text-xs font-bold text-claude-muted hover:bg-white">取消</button>
-                      <button type="button" onClick={() => m.id && saveEdit(m.id)} className="rounded-full bg-claude-accent px-3 py-1 text-xs font-bold text-white hover:bg-claude-accentHover">保存</button>
+                      <button type="button" onClick={() => setEditingId(null)} className="btn-ghost h-8 px-3 text-xs">取消</button>
+                      <button type="button" onClick={() => m.id && saveEdit(m.id)} className="btn-accent h-8 px-4 text-xs">保存</button>
                     </div>
                   </div>
                 ) : (
-                  <div className="whitespace-pre-wrap">{m.content}{m.edited && <span className="ml-1 text-[10px] text-claude-muted">(已编辑)</span>}</div>
+                  <div className="whitespace-pre-wrap">{m.content}{m.edited && <span className="ml-1 text-[10px] text-island-muted">(已编辑)</span>}</div>
                 )}
-                {m.streaming && <span className="inline-block w-1.5 h-4 ml-1 bg-claude-accent animate-pulse align-middle" />}
+                {m.streaming && <span className="inline-block w-1.5 h-4 ml-1 bg-island-accent animate-pulse align-middle" />}
               </div>
 
               {/* 悬浮操作：assistant → 深挖/发散/分支/删除；user → 编辑/删除/沉淀
                   放在气泡外侧空白区（assistant 右侧 / user 左侧），避免遮挡气泡内的可点击术语 */}
               {!m.streaming && (
                 <div
-                  className="absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-white bg-white/95 px-1 py-0.5 opacity-0 shadow-soft transition-opacity group-hover:opacity-100"
+                  className="absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-island-border bg-island-card/95 px-1 py-0.5 opacity-0 shadow-soft transition-opacity group-hover:opacity-100"
                   style={m.role === "user" ? { left: 0 } : { right: 0 }}
                 >
                   {m.role === "assistant" ? (
                     <>
-                      <button type="button" onClick={() => openExploreFromMessage(m, "child")} title="深挖这段内容的背景知识" className="rounded-full p-1 text-claude-muted hover:bg-claude-accentSoft hover:text-claude-accent"><ArrowUpRight size={13} /></button>
-                      <button type="button" onClick={() => openExploreFromMessage(m, "related")} title="横向对比发散" className="rounded-full p-1 text-claude-muted hover:bg-claude-accentSoft hover:text-claude-accent"><ArrowRight size={13} /></button>
-                      <button type="button" onClick={() => openExploreFromMessage(m, "branch")} title="继承上下文另起分支" className="rounded-full p-1 text-claude-muted hover:bg-claude-accentSoft hover:text-claude-accent"><ArrowDown size={13} /></button>
-                      <span className="mx-0.5 h-3 w-px bg-claude-border/70" />
-                      <button type="button" onClick={() => deleteRound(m, i)} title="删除这一轮" className="rounded-full p-1 text-claude-muted hover:bg-red-50 hover:text-red-500"><Trash2 size={13} /></button>
+                      <button type="button" onClick={() => openExploreFromMessage(m, "child")} title="深挖这段内容的背景知识" className="rounded-full p-1 text-island-muted hover:bg-island-accentSoft hover:text-island-accent"><ArrowUpRight size={13} /></button>
+                      <button type="button" onClick={() => openExploreFromMessage(m, "related")} title="横向对比发散" className="rounded-full p-1 text-island-muted hover:bg-island-accentSoft hover:text-island-accent"><ArrowRight size={13} /></button>
+                      <button type="button" onClick={() => openExploreFromMessage(m, "branch")} title="继承上下文另起分支" className="rounded-full p-1 text-island-muted hover:bg-island-accentSoft hover:text-island-accent"><ArrowDown size={13} /></button>
+                      <span className="mx-0.5 h-3 w-px bg-island-border/70" />
+                      <button type="button" onClick={() => deleteRound(m, i)} title="删除这一轮" className="rounded-full p-1 text-island-muted hover:bg-island-error/10 hover:text-island-error"><Trash2 size={13} /></button>
                     </>
                   ) : (
                     <>
-                      <button type="button" onClick={() => { setEditingId(m.id ?? null); setEditText(m.content); }} title="编辑这条消息" className="rounded-full p-1 text-claude-muted hover:bg-claude-accentSoft hover:text-claude-accent"><Pencil size={13} /></button>
-                      <button type="button" onClick={() => deleteRound(m, i)} title="删除这一轮" className="rounded-full p-1 text-claude-muted hover:bg-red-50 hover:text-red-500"><Trash2 size={13} /></button>
+                      <button type="button" onClick={() => { setEditingId(m.id ?? null); setEditText(m.content); }} title="编辑这条消息" className="rounded-full p-1 text-island-muted hover:bg-island-accentSoft hover:text-island-accent"><Pencil size={13} /></button>
+                      <button type="button" onClick={() => deleteRound(m, i)} title="删除这一轮" className="rounded-full p-1 text-island-muted hover:bg-island-error/10 hover:text-island-error"><Trash2 size={13} /></button>
                       {isInsightCandidate(m.content) && (
                         <button type="button" onClick={() => depositInsight(m)} title="用自己的话理解了？沉淀到思维宇宙" className="rounded-full bg-island-lavender/20 p-1 text-island-lavender hover:bg-island-lavender hover:text-white"><Brain size={13} /></button>
                       )}
@@ -951,7 +949,7 @@ export default function ChatPage() {
       {quoteBtn && (
         <div
           style={{ left: quoteBtn.x - 84, top: quoteBtn.y }}
-          className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-white bg-white/95 p-1 shadow-island backdrop-blur"
+          className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-island-border bg-island-card/95 p-1 shadow-island backdrop-blur"
         >
           <button
             type="button"
@@ -960,7 +958,7 @@ export default function ChatPage() {
               setQuoteBtn(null);
               window.getSelection()?.removeAllRanges();
             }}
-            className="flex items-center gap-1 rounded-full bg-claude-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-claude-accentHover"
+            className="flex items-center gap-1 rounded-full bg-island-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-island-accentHover"
             title="以选中内容为名词打开追问卡片"
           >
             <Search size={12} /> 追问
@@ -972,7 +970,7 @@ export default function ChatPage() {
               setQuoteBtn(null);
               window.getSelection()?.removeAllRanges();
             }}
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-claude-muted transition-colors hover:bg-claude-panel hover:text-claude-ink"
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-island-muted transition-colors hover:bg-island-panel hover:text-island-ink"
             title="把选中内容作为引用带入输入框"
           >
             <QuoteIcon size={12} /> 引用
@@ -981,7 +979,7 @@ export default function ChatPage() {
       )}
 
       {/* 资源生成快捷栏 */}
-      <div className="border-t bg-claude-panel/50 px-4 py-2">
+      <div className="border-t border-island-border bg-island-panel/40 px-4 py-2">
         <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-center gap-1.5">
           {RESOURCE_ACTIONS.map((a) => {
             const selected = pendingResource === a.type;
@@ -991,10 +989,10 @@ export default function ChatPage() {
                 disabled={busy}
                 onClick={() => { setPendingResource(selected ? null : a.type); }}
                 className={
-                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
+                  "inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-xs font-bold transition-all duration-200 ease-island disabled:opacity-50 " +
                   (selected
-                    ? "bg-claude-accent text-white border-claude-accent"
-                    : "bg-white hover:bg-claude-accentSoft hover:border-claude-accent/40")
+                    ? "bg-island-accent text-white border-island-accent"
+                    : "border-island-border bg-island-card text-island-inkSoft hover:-translate-y-px hover:border-island-accent/60 hover:text-island-accentDeep")
                 }
                 title={selected ? `已选择${a.label}，输入主题后发送` : `使用${a.label}`}
               >
@@ -1009,10 +1007,10 @@ export default function ChatPage() {
             disabled={busy}
             onClick={() => { setQuizMode(!quizMode); setPendingResource(null); }}
             className={
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
+              "inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-xs font-bold transition-all duration-200 ease-island disabled:opacity-50 " +
               (quizMode
                 ? "bg-island-lavender text-white border-island-lavender"
-                : "bg-white hover:bg-island-lavender/10 hover:border-island-lavender/40")
+                : "border-island-border bg-island-card text-island-inkSoft hover:-translate-y-px hover:border-island-lavender/60 hover:text-island-lavender")
             }
             title={quizMode ? "已选择互动刷题，输入想练习的主题后发送" : "互动刷题：一题一题作答、即时批改"}
           >
@@ -1023,16 +1021,16 @@ export default function ChatPage() {
       </div>
 
       {/* 输入区 — AI coding 风格单卡片容器 */}
-      <div className="border-t bg-claude-bg px-4 py-3">
+      <div className="border-t bg-island-bg px-4 py-3">
         <div className="mx-auto max-w-4xl">
           {quote && (
-            <div className="mb-2 flex items-start gap-2 rounded-2xl border border-claude-accent/30 bg-claude-accentSoft/50 px-3 py-2 text-xs text-claude-ink">
-              <QuoteIcon size={13} className="mt-0.5 shrink-0 text-claude-accent" />
+            <div className="mb-2 flex items-start gap-2 rounded-[16px] border border-island-accent/30 bg-island-accentSoft/60 px-3 py-2 text-xs text-island-ink">
+              <QuoteIcon size={13} className="mt-0.5 shrink-0 text-island-accentDeep" />
               <div className="min-w-0 flex-1">
-                <div className="mb-0.5 font-extrabold text-claude-accent">引用内容</div>
-                <div className="line-clamp-2 whitespace-pre-wrap text-claude-muted">{quote}</div>
+                <div className="mb-0.5 font-extrabold text-island-accentDeep">引用内容</div>
+                <div className="line-clamp-2 whitespace-pre-wrap text-island-muted">{quote}</div>
               </div>
-              <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-1 text-claude-muted hover:bg-white hover:text-claude-ink" title="移除引用"><X size={13} /></button>
+              <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-1 text-island-muted hover:bg-island-card hover:text-island-ink" title="移除引用"><X size={13} /></button>
             </div>
           )}
           <input
@@ -1046,7 +1044,7 @@ export default function ChatPage() {
               e.target.value = "";
             }}
           />
-          <div className="relative overflow-visible rounded-[1.5rem] border border-white bg-white shadow-island focus-within:ring-4 focus-within:ring-claude-accent/15">
+          <div className="relative overflow-visible rounded-bubble border-2 border-island-border bg-island-card shadow-island transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -1061,14 +1059,14 @@ export default function ChatPage() {
                   : "输入问题或学习目标…（Shift+Enter 换行；选中回答文本可引用）"
               }
               rows={3}
-              className="border-0 shadow-none focus:ring-0 rounded-none min-h-[72px] max-h-52 bg-transparent"
+              className="min-h-[72px] max-h-52 rounded-none border-0 bg-transparent shadow-none outline-none focus:ring-0 focus-visible:outline-none"
             />
             {/* 底部工具栏：左附件 + 右发送按钮 + 模型名 */}
-            <div className="flex items-center justify-between border-t border-claude-border/60 bg-claude-panel/35 px-3 py-2">
+            <div className="flex items-center justify-between border-t border-island-border bg-island-panel/50 px-3 py-2">
               <button
                 disabled={busy}
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-claude-muted hover:bg-claude-panel hover:text-claude-ink transition-colors disabled:opacity-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-island-muted transition-colors hover:bg-island-card hover:text-island-ink disabled:opacity-50"
                 title="上传图片提问（图片理解）"
               >
                 <Paperclip size={16} />
@@ -1079,7 +1077,7 @@ export default function ChatPage() {
                 <button
                   onClick={() => send()}
                   disabled={busy || !input.trim() || !selectedModel}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-claude-accent text-white shadow-soft transition-all hover:-translate-y-0.5 hover:bg-claude-accentHover disabled:pointer-events-none disabled:opacity-40"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-island-accent text-white shadow-btn-3d-teal transition-all duration-200 ease-island hover:-translate-y-px hover:bg-island-accentHover hover:shadow-btn-3d-teal-hover active:translate-y-[2px] active:shadow-btn-3d-teal-active disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
                   title="发送"
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

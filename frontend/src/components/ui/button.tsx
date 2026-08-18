@@ -1,34 +1,36 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * animal-island-ui 按钮规范：
+ * - pill 形（rounded-full），字重 600+
+ * - 3D 像素堆叠阴影仅用于 primary 级（primary / accent）
+ * - default / soft / ghost 只用柔和高程阴影
+ */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "ghost" | "outline" | "soft";
+  variant?: "primary" | "accent" | "default" | "soft" | "ghost";
   size?: "sm" | "md" | "lg" | "icon";
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", ...props }, ref) => {
     const variants = {
-      primary: "bg-claude-accent text-white shadow-soft hover:-translate-y-0.5 hover:bg-claude-accentHover hover:shadow-island",
-      ghost: "text-claude-ink hover:bg-white hover:text-claude-accent hover:shadow-soft",
-      outline: "border bg-white text-claude-ink shadow-soft hover:-translate-y-0.5 hover:border-claude-accent/40 hover:bg-claude-accentSoft/60",
-      soft: "bg-claude-accentSoft text-claude-accent hover:bg-claude-accent/20",
+      primary: "btn-primary",
+      accent: "btn-accent",
+      default: "btn-default",
+      soft: "btn bg-island-accentSoft text-island-accentDeep shadow-none hover:bg-island-accent/20",
+      ghost: "btn-ghost",
     };
     const sizes = {
-      sm: "h-9 px-3.5 text-xs",
-      md: "h-10 px-4 text-sm",
-      lg: "h-12 px-6 text-base",
-      icon: "h-10 w-10",
+      sm: "h-9 px-4 text-xs",
+      md: "h-10 px-5 text-sm",
+      lg: "h-12 px-7 text-base",
+      icon: "h-10 w-10 px-0",
     };
     return (
       <button
         ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-full font-bold transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none",
-          variants[variant],
-          sizes[size],
-          className
-        )}
+        className={cn(variants[variant], sizes[size], className)}
         {...props}
       />
     );

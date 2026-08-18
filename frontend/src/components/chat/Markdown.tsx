@@ -26,9 +26,9 @@ function MermaidBlock({ code }: { code: string }) {
         // 渲染失败时降级为原始代码块，保证内容可见（并附错误摘要便于理解）
         if (!cancelled && ref.current) {
           const message = String(err?.message || err || "未知错误").slice(0, 120);
-          ref.current.innerHTML = `<div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
-            <div class="font-bold text-amber-700">图示渲染失败：${escapeHtml(message)}</div>
-            <pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded-lg bg-[#2f4144] p-2 text-[12px] text-[#f8fffd]">${escapeHtml(code)}</pre>
+          ref.current.innerHTML = `<div class="rounded-xl border border-island-warn/40 bg-island-warn/10 px-3 py-2 text-xs">
+            <div class="font-bold text-[#8a6010]">图示渲染失败：${escapeHtml(message)}</div>
+            <pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded-lg bg-[#463729] p-2 text-[12px] text-[#f8f1de]">${escapeHtml(code)}</pre>
           </div>`;
         }
       }
@@ -329,7 +329,7 @@ export function Markdown({
   onTermClick?: (term: ChatTerm) => void;
 }) {
   return (
-    <div className="prose-claude">
+    <div className="prose-island">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath, [remarkTerms as any, { terms }]]}
         rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}
@@ -352,7 +352,7 @@ export function Markdown({
               return (
                 <button
                   type="button"
-                  className="cursor-pointer border-b border-dashed border-claude-accent/70 bg-claude-accentSoft/35 px-0.5 text-left text-claude-accent transition-colors hover:bg-claude-accentSoft hover:text-claude-accentHover"
+                  className="cursor-pointer border-b border-dashed border-island-accent/60 bg-island-accentSoft/40 px-0.5 text-left font-bold text-island-accentDeep transition-colors hover:bg-island-accentSoft"
                   title={`围绕「${text}」继续提问`}
                   onClick={() => onTermClick?.(term)}
                 >

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAppStore, type ExploreCardState } from "@/stores/app";
 import { ExploreCard } from "@/components/explore/ExploreCard";
-import { ListTree, PanelsTopLeft, X } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, ListTree, PanelsTopLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,26 +62,30 @@ export function ExploreDock() {
 
   const treeRows = buildTreeRows();
 
-  const MODE_ICON: Record<string, string> = { child: "↗️", related: "➡️", branch: "⬇️" };
+  const MODE_ICON: Record<string, { icon: typeof ArrowUpRight; cls: string }> = {
+    child: { icon: ArrowUpRight, cls: "text-[#4358c0]" },
+    related: { icon: ArrowRight, cls: "text-[#a05a28]" },
+    branch: { icon: ArrowDown, cls: "text-[#7a3fd0]" },
+  };
   const STATUS_DOT: Record<string, string> = {
-    pending: "bg-claude-border",
+    pending: "bg-island-faint",
     opening: "bg-island-sky animate-pulse",
-    streaming: "bg-claude-accent animate-pulse",
-    done: "bg-island-mint",
-    error: "bg-red-400",
+    streaming: "bg-island-accent animate-pulse",
+    done: "bg-island-seafoam",
+    error: "bg-island-error",
   };
 
   return (
     <>
-      <div className="explore-card-in fixed right-5 top-3 z-[95] flex items-center gap-2 rounded-full border border-white bg-white/90 px-3 py-1.5 text-xs font-bold text-claude-muted shadow-island backdrop-blur">
-        <PanelsTopLeft size={13} className="text-claude-accent" />
+      <div className="explore-card-in fixed right-5 top-3 z-[95] flex items-center gap-2 rounded-full border border-island-border bg-island-card/90 px-3 py-1.5 text-xs font-bold text-island-muted shadow-island backdrop-blur">
+        <PanelsTopLeft size={13} className="text-island-accentDeep" />
         <span>{cards.length} 张探索卡片</span>
         <button
           type="button"
           onClick={() => setTreeOpen((v) => !v)}
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 transition-colors",
-            treeOpen ? "bg-island-lavender text-white" : "bg-claude-panel text-claude-muted hover:bg-island-lavender/20 hover:text-island-lavender"
+            treeOpen ? "bg-island-lavender text-white" : "bg-island-panel text-island-muted hover:bg-island-lavender/20 hover:text-island-lavender"
           )}
           title={treeOpen ? "收起卡片树" : "展开卡片树（树状定位）"}
         >
@@ -91,7 +95,7 @@ export function ExploreDock() {
         <button
           type="button"
           onClick={exploreCloseAll}
-          className="rounded-full bg-claude-accent px-2.5 py-0.5 text-white transition-colors hover:bg-claude-accentHover"
+          className="rounded-full bg-island-accent px-2.5 py-0.5 text-white transition-all duration-200 ease-island hover:-translate-y-px hover:bg-island-accentHover"
           title="关闭全部卡片，回到主线"
         >
           回主线
@@ -100,24 +104,26 @@ export function ExploreDock() {
 
       {/* 卡片树面板 — 仓库目录树风格 */}
       {treeOpen && (
-        <div className="explore-card-in fixed left-4 top-[4.5rem] z-[120] flex max-h-[70vh] w-[19rem] flex-col overflow-hidden rounded-[1.25rem] border border-white bg-[#f8fcfb]/95 shadow-island backdrop-blur">
-          <div className="flex items-center justify-between border-b border-claude-border/70 bg-white/80 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-xs font-extrabold text-claude-ink">
+        <div className="explore-card-in fixed left-4 top-[4.5rem] z-[120] flex max-h-[70vh] w-[19rem] flex-col overflow-hidden rounded-[1.25rem] border border-island-border bg-island-content/95 shadow-island backdrop-blur">
+          <div className="flex items-center justify-between border-b border-island-border bg-island-card/80 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-island-ink">
               <ListTree size={13} className="text-island-lavender" />
               探索卡片树
             </div>
             <button
               type="button"
               onClick={() => setTreeOpen(false)}
-              className="rounded-full p-1 text-claude-muted hover:bg-claude-panel hover:text-claude-ink"
+              className="rounded-full p-1 text-island-muted hover:bg-island-panel hover:text-island-ink"
               title="收起"
             >
               <X size={13} />
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            <div className="rounded-xl bg-white/70 p-1.5 text-[10px] font-bold leading-4 text-claude-muted">
-              <span className="font-mono">├─</span> 子卡片（深挖）　<span className="font-mono">➡️</span> 关联（对比）　<span className="font-mono">⬇️</span> 分支
+            <div className="flex items-center gap-2 rounded-[12px] bg-island-card/80 p-1.5 text-[10px] font-bold leading-4 text-island-muted">
+              <span className="inline-flex items-center gap-0.5"><ArrowUpRight size={10} className="text-[#4358c0]" /> 深挖</span>
+              <span className="inline-flex items-center gap-0.5"><ArrowRight size={10} className="text-[#a05a28]" /> 对比</span>
+              <span className="inline-flex items-center gap-0.5"><ArrowDown size={10} className="text-[#7a3fd0]" /> 分支</span>
             </div>
             <div className="mt-1.5 space-y-px">
               {treeRows.map((row) => {
@@ -129,26 +135,29 @@ export function ExploreDock() {
                     onClick={() => exploreFocus(c.key)}
                     className={cn(
                       "group flex cursor-pointer items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors",
-                      active ? "bg-claude-accentSoft ring-2 ring-claude-accent/40" : "hover:bg-white"
+                      active ? "bg-island-accentSoft ring-2 ring-island-accent/40" : "hover:bg-island-card"
                     )}
                     title={`定位卡片「${c.term}」`}
                   >
-                    <span className="shrink-0 whitespace-pre font-mono text-[10px] leading-4 text-claude-border">
+                    <span className="shrink-0 whitespace-pre font-mono text-[10px] leading-4 text-island-borderStrong/70">
                       {row.prefix}
                       {row.isLast ? "└─ " : "├─ "}
                     </span>
-                    <span className="shrink-0 text-[10px] leading-4">{MODE_ICON[c.mode] ?? "↗️"}</span>
-                    <span className={cn("min-w-0 flex-1 truncate text-[11px] font-bold", active ? "text-claude-accent" : "text-claude-ink")}>
+                    {(() => {
+                      const ModeIcon = (MODE_ICON[c.mode] ?? MODE_ICON.child).icon;
+                      return <ModeIcon size={11} strokeWidth={2.6} className={cn("shrink-0", (MODE_ICON[c.mode] ?? MODE_ICON.child).cls)} />;
+                    })()}
+                    <span className={cn("min-w-0 flex-1 truncate text-[11px] font-bold", active ? "text-island-accent" : "text-island-ink")}>
                       {c.term}
                     </span>
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[c.status] ?? "bg-claude-border")} title={c.status} />
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[c.status] ?? "bg-island-faint")} title={c.status} />
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         exploreClose(c.key);
                       }}
-                      className="shrink-0 rounded-md p-0.5 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                      className="shrink-0 rounded-md p-0.5 text-island-muted opacity-0 transition-opacity hover:bg-island-error/10 hover:text-island-error group-hover:opacity-100"
                       title="关闭这张卡片"
                     >
                       <X size={10} />

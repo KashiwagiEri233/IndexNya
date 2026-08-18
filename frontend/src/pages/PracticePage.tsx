@@ -7,6 +7,7 @@ import {
 import { api, type PracticeRecord } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { Badge } from "@/components/ui/badge";
+import { RibbonTitle } from "@/components/ui/ribbon";
 import { cn } from "@/lib/utils";
 
 type FilterKey = "all" | "wrong" | "right" | "pending";
@@ -20,12 +21,12 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 function statusBadge(r: PracticeRecord) {
   if (r.is_correct === true) {
-    return { icon: CheckCircle2, label: "答对", cls: "text-green-600 bg-green-50 border-green-200" };
+    return { icon: CheckCircle2, label: "答对", cls: "text-island-success bg-island-success/10 border-island-success/30" };
   }
   if (r.is_correct === false) {
-    return { icon: XCircle, label: "答错", cls: "text-red-500 bg-red-50 border-red-200" };
+    return { icon: XCircle, label: "答错", cls: "text-island-error bg-island-error/10 border-island-error/30" };
   }
-  return { icon: HelpCircle, label: "未作答", cls: "text-claude-muted bg-claude-panel border-claude-border" };
+  return { icon: HelpCircle, label: "未作答", cls: "text-island-muted bg-island-panel border-island-borderStrong/40" };
 }
 
 export default function PracticePage() {
@@ -83,9 +84,8 @@ export default function PracticePage() {
   return (
     <div className="h-full overflow-y-auto">
       <header className="island-header">
-        <div className="island-header-title">
-          <ClipboardCheck size={18} className="text-island-lavender" />
-          <h1 className="font-semibold">错题本</h1>
+        <div className="flex items-center gap-3">
+          <RibbonTitle color="yellow" icon={<ClipboardCheck size={14} />}>错题本</RibbonTitle>
           <Badge variant="accent">{items.length} 项</Badge>
         </div>
         <div className="flex items-center gap-2">
@@ -93,7 +93,7 @@ export default function PracticePage() {
             type="button"
             onClick={repracticeWrong}
             disabled={wrongCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs font-bold text-claude-muted shadow-soft transition-colors hover:border-island-lavender/50 hover:text-island-lavender disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-default h-9 px-3.5 text-xs hover:border-island-lavender/60 hover:text-[#7a3fd0]"
             title={wrongCount > 0 ? `重练 ${wrongCount} 道错题` : "还没有答错的题目"}
           >
             <RefreshCw size={13} /> 重练错题{wrongCount > 0 ? `（${wrongCount}）` : ""}
@@ -102,7 +102,7 @@ export default function PracticePage() {
             type="button"
             onClick={clearAll}
             disabled={items.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs font-bold text-claude-muted shadow-soft transition-colors hover:border-red-200 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-default h-9 px-3.5 text-xs hover:border-island-error/50 hover:text-island-error"
             title="清空全部错题记录"
           >
             <Trash2 size={13} /> 清空
@@ -118,8 +118,8 @@ export default function PracticePage() {
               type="button"
               onClick={() => setFilter(f.key)}
               className={cn(
-                "shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors",
-                filter === f.key ? "bg-island-lavender text-white" : "bg-claude-panel text-claude-muted hover:bg-white"
+                "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-200 ease-island",
+                filter === f.key ? "bg-island-lavender text-white" : "bg-island-panel text-island-inkSoft hover:-translate-y-px hover:bg-island-card"
               )}
             >
               {f.label}
@@ -128,11 +128,11 @@ export default function PracticePage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-claude-muted"><Loader2 size={16} className="animate-spin" /> 加载中…</div>
+          <div className="flex items-center gap-2 text-island-muted"><Loader2 size={16} className="animate-spin" /> 加载中…</div>
         ) : items.length === 0 ? (
-          <div className="rounded-[2rem] border border-dashed border-claude-border bg-white/50 px-5 py-16 text-center text-claude-muted">
+          <div className="rounded-bubble border-2 border-dashed border-island-borderStrong/40 bg-island-card/60 px-5 py-16 text-center text-island-muted">
             <ClipboardCheck size={40} className="mx-auto mb-3 text-island-lavender/60" />
-            <p className="font-medium text-claude-ink">{filter === "all" ? "还没有刷题记录" : "这个分类下没有题目"}</p>
+            <p className="font-extrabold text-island-ink">{filter === "all" ? "还没有刷题记录" : "这个分类下没有题目"}</p>
             <p className="mt-2 text-sm">去对话页说「来几道题刷一刷」，互动刷题中出过的题目会自动收进这里。</p>
           </div>
         ) : (
@@ -148,14 +148,14 @@ export default function PracticePage() {
                         <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold", badge.cls)}>
                           <Icon size={11} /> {badge.label}
                         </span>
-                        {r.topic && <span className="text-[11px] font-bold text-claude-muted">{r.topic}</span>}
+                        {r.topic && <span className="text-[11px] font-bold text-island-muted">{r.topic}</span>}
                       </div>
-                      <div className="mt-1.5 text-sm font-medium leading-6 text-claude-ink whitespace-pre-wrap">{r.question}</div>
+                      <div className="mt-1.5 whitespace-pre-wrap text-sm font-medium leading-6 text-island-inkSoft">{r.question}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => deleteRecord(r)}
-                      className="shrink-0 rounded-lg p-1.5 text-claude-muted transition-colors hover:bg-red-50 hover:text-red-500"
+                      className="shrink-0 rounded-lg p-1.5 text-island-muted transition-colors hover:bg-island-error/10 hover:text-island-error"
                       title="删除这道题"
                     >
                       <Trash2 size={14} />
@@ -165,19 +165,19 @@ export default function PracticePage() {
                   {r.options.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {r.options.map((opt, i) => (
-                        <li key={i} className="rounded-lg bg-claude-panel/60 px-2.5 py-1 text-xs text-claude-ink">{opt}</li>
+                        <li key={i} className="rounded-[12px] bg-island-panel/70 px-2.5 py-1 text-xs text-island-inkSoft">{opt}</li>
                       ))}
                     </ul>
                   )}
 
                   <details className="mt-2 group">
-                    <summary className="flex cursor-pointer select-none items-center gap-1 text-xs font-bold text-claude-muted transition-colors hover:text-claude-accent">
+                    <summary className="flex cursor-pointer select-none items-center gap-1 text-xs font-bold text-island-muted transition-colors hover:text-island-accentDeep">
                       <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
                       查看答案与解析
                     </summary>
-                    <div className="mt-2 space-y-1.5 rounded-xl border bg-white/70 px-3 py-2 text-xs leading-5">
-                      <div><span className="font-bold text-green-700">答案：</span>{r.answer || "—"}</div>
-                      {r.explanation && <div className="text-claude-muted">{r.explanation}</div>}
+                    <div className="mt-2 space-y-1.5 rounded-[14px] border border-island-border bg-island-card/80 px-3 py-2 text-xs leading-5 text-island-inkSoft">
+                      <div><span className="font-bold text-island-success">答案：</span>{r.answer || "—"}</div>
+                      {r.explanation && <div className="text-island-muted">{r.explanation}</div>}
                     </div>
                   </details>
                 </div>
