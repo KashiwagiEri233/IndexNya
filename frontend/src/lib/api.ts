@@ -10,13 +10,26 @@ export interface Message {
   created_at: string;
 }
 
-export interface ChatModel {
+/** 提供商内可选的一个模型。 */
+export interface ProviderModel {
+  /** 模型标识（发给 API 的 model id，如 deepseek-chat） */
   id: string;
+  /** 显示名 */
   name: string;
-  model: string;
-  baseUrl?: string;
-  apiKey?: string;
-  type?: "chat" | "image";
+}
+
+/** 一个模型提供商（OpenAI 兼容端点），其下可配置多个可选模型。 */
+export interface ModelProvider {
+  /** 提供商标识（稳定 id，如 deepseek / custom-openai） */
+  id: string;
+  /** 提供商显示名 */
+  name: string;
+  /** OpenAI 兼容端点 */
+  baseUrl: string;
+  /** API Key */
+  apiKey: string;
+  /** 该提供商下的可选模型列表 */
+  models: ProviderModel[];
 }
 
 export interface ChatTerm {
@@ -87,7 +100,7 @@ export interface CardRow {
   created_at: string;
 }
 
-export type ModelPayload = { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: string };
+export type ModelPayload = { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: string; reasoning_effort?: string };
 
 export interface ExploreCardPayload {
   term: string;
@@ -160,7 +173,7 @@ export const api = {
     );
   },
 
-  async testModelConnection(model: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" }) {
+  async testModelConnection(model: ModelPayload) {
     return j<{ ok: boolean; model: string; message: string; preview?: string; detail?: string }>(
       await fetch(`${API_BASE}/models/test`, {
         method: "POST",
@@ -213,7 +226,7 @@ export const api = {
     topic: string;
     conversation_id?: number;
     extra?: Record<string, any>;
-    model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
+    model?: ModelPayload;
   }) {
     return j<Resource>(
       await fetch(`${API_BASE}/resources/generate`, {
@@ -298,7 +311,7 @@ export const api = {
       message: string;
       resource_type?: string;
       mode?: string;
-      model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
+      model?: ModelPayload;
       context?: string;
     },
     handlers: {

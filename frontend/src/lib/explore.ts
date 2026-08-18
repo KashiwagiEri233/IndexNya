@@ -1,6 +1,6 @@
 /** 探索卡片驱动器 — 两阶段流程：先打开提问编辑态，点发送后再请求 LLM。 */
-import { api, type CardRow, type ChatModel, type ChatTerm, type ExploreCardPayload, type ExploreMode } from "@/lib/api";
-import { useAppStore, type ExploreCardState } from "@/stores/app";
+import { api, type CardRow, type ChatTerm, type ExploreCardPayload, type ExploreMode } from "@/lib/api";
+import { useAppStore, requestModelOf, resolveModelEntry, resolveSelectedModel, type SelectedModelEntry, type ExploreCardState } from "@/stores/app";
 
 export interface OpenExploreOptions {
   term: string;
@@ -16,25 +16,15 @@ export interface OpenExploreOptions {
   branchConversationId?: number;
 }
 
-export function resolveModel(modelId?: string): ChatModel | undefined {
+export function resolveModel(modelId?: string): SelectedModelEntry | undefined {
   const state = useAppStore.getState();
-  if (modelId) {
-    const found = state.models.find((m) => m.id === modelId);
-    if (found) return found;
-  }
-  return state.models.find((m) => m.id === state.selectedModelId && m.type !== "image");
+  const key = modelId ?? state.selectedModelKey;
+  return resolveModelEntry(state.providers, key)
+    ?? resolveSelectedModel({ providers: state.providers, selectedModelKey: state.selectedModelKey });
 }
 
-function toModelPayload(model?: ChatModel) {
-  if (!model) return undefined;
-  return {
-    id: model.id,
-    name: model.name,
-    model: model.model,
-    base_url: model.baseUrl,
-    api_key: model.apiKey,
-    type: model.type,
-  };
+function toModelPayload(model?: SelectedModelEntry) {
+  return requestModelOf(model);
 }
 
 function patchCard(key: string, patch: Partial<ExploreCardState>) {
@@ -72,7 +62,7 @@ export function openExploreCard(opts: OpenExploreOptions): string | null {
     sourceMessageId: opts.sourceMessageId,
     parentCardId: opts.parentCardId,
     parentKey: opts.parentKey,
-    modelId: opts.modelId ?? state.selectedModelId,
+    modelId: opts.modelId ?? state.selectedModelKey,
     status: "pending",
     messages: [],
   });
@@ -105,7 +95,7 @@ export async function restoreExploreCard(row: CardRow): Promise<string | null> {
     branchConversationId: row.branch_conversation_id ?? undefined,
     sourceMessageId: row.source_message_id ?? undefined,
     parentCardId: row.parent_card_id ?? undefined,
-    modelId: state.selectedModelId,
+    modelId: state.selectedModelKey,
     status: "done",
     messages,
   });

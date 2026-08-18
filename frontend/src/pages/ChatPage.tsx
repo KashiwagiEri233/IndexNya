@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Send, Sparkles, FileText, Map as MapIcon, Loader2, Paperclip,
@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/chat/Markdown";
 import { ModelSelector } from "@/components/chat/ModelSelector";
+import { ReasoningSelector } from "@/components/chat/ReasoningSelector";
 import { ExploreDock } from "@/components/explore/ExploreDock";
 import { openExploreCard } from "@/lib/explore";
-import { api, type ChatModel, type ChatTerm } from "@/lib/api";
-import { useAppStore } from "@/stores/app";
+import { api, type ChatTerm } from "@/lib/api";
+import { useAppStore, requestModelOf, resolveModelEntry, resolveSelectedModel, type SelectedModelEntry } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
 interface ChatMsg {
@@ -106,15 +107,8 @@ function QuizCard({ quiz, onAnswer }: { quiz: NonNullable<ChatMsg["quiz"]>; onAn
   );
 }
 
-function toRequestModel(model: ChatModel | undefined) {
-  if (!model) return undefined;
-  return {
-    id: model.id,
-    name: model.name,
-    model: model.model,
-    base_url: model.baseUrl,
-    api_key: model.apiKey,
-  };
+function toRequestModel(entry: SelectedModelEntry | undefined) {
+  return requestModelOf(entry);
 }
 
 /** 用自己的话表达理解的候选检测（启发式，命中后提示沉淀到思维宇宙）。 */
@@ -158,13 +152,20 @@ function msgFromRow(m: any): ChatMsg {
 
 function SideChatPanel({
   conversationId,
-  model,
+  modelKey,
   onClose,
 }: {
   conversationId: number;
-  model?: ChatModel;
+  /** 模型选择 key（providerId::modelId）；缺省时使用当前选中模型 */
+  modelKey?: string;
   onClose: () => void;
 }) {
+  const providers = useAppStore((s) => s.providers);
+  const selectedModelKey = useAppStore((s) => s.selectedModelKey);
+  const sideEntry = useMemo(
+    () => resolveModelEntry(providers, modelKey) ?? resolveSelectedModel({ providers, selectedModelKey }),
+    [providers, modelKey, selectedModelKey]
+  );
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -249,7 +250,7 @@ function SideChatPanel({
     setBusy(true);
     try {
       await api.chatStream(
-        { conversation_id: conversationId, message: text, model: toRequestModel(model), context },
+        { conversation_id: conversationId, message: text, model: toRequestModel(sideEntry), context },
         {
           onToken: (token) => setMessages((current) => {
             const next = [...current];
@@ -359,7 +360,7 @@ function SideChatPanel({
         <div className="overflow-hidden rounded-2xl border border-white bg-white shadow-soft focus-within:ring-4 focus-within:ring-claude-accent/15">
           <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} rows={2} placeholder="在侧边分支中继续追问…" className="w-full resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none" />
           <div className="flex items-center justify-between border-t border-claude-border/60 px-2 py-1.5">
-            <span className="max-w-[190px] truncate text-[10px] font-bold text-claude-muted">{model?.name || "未选择模型"}</span>
+            <span className="max-w-[190px] truncate text-[10px] font-bold text-claude-muted">{sideEntry ? `${sideEntry.provider.name} · ${sideEntry.model.name}` : "未选择模型"}</span>
             <button type="button" onClick={send} disabled={busy || !input.trim()} className="flex h-7 w-7 items-center justify-center rounded-full bg-claude-accent text-white disabled:opacity-40" title="发送">{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button>
           </div>
         </div>
@@ -374,9 +375,12 @@ export default function ChatPage() {
   const setConvId = useAppStore((s) => s.setConvId);
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const setPendingInsight = useAppStore((s) => s.setPendingInsight);
-  const models = useAppStore((s) => s.models);
-  const selectedModelId = useAppStore((s) => s.selectedModelId);
-  const selectedModel = models.find((model) => model.id === selectedModelId && model.type !== "image");
+  const providers = useAppStore((s) => s.providers);
+  const selectedModelKey = useAppStore((s) => s.selectedModelKey);
+  const selectedModel = useMemo(
+    () => resolveSelectedModel({ providers, selectedModelKey }),
+    [providers, selectedModelKey]
+  );
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -384,7 +388,7 @@ export default function ChatPage() {
   const [pendingResource, setPendingResource] = useState<string | null>(null);
   const [quizMode, setQuizMode] = useState(false);
   const [sideConvId, setSideConvId] = useState<number | null>(null);
-  const [sideModel, setSideModel] = useState<ChatModel | undefined>();
+  const [sideModelKey, setSideModelKey] = useState<string | undefined>();
   const scrollRef = useRef<HTMLDivElement>(null);
   // 首条消息创建新会话时，onMeta 会更新 convId；跳过这一次历史拉取，避免覆盖正在流式生成的本地消息。
   const skipHistoryLoadForRef = useRef<number | null>(null);
@@ -419,7 +423,7 @@ export default function ChatPage() {
   // 拉取当前对话的历史消息（convId 变化时）
   useEffect(() => {
     setSideConvId(null);
-    setSideModel(undefined);
+    setSideModelKey(undefined);
     if (!convId) {
       setMessages([]);
       return;
@@ -503,7 +507,7 @@ export default function ChatPage() {
     setInput("");
     setQuote(null);
     const context = quote ? `被引用的内容：${quote}` : undefined;
-    setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "", streaming: true, modelId: selectedModel?.id }]);
+    setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "", streaming: true, modelId: selectedModel?.key }]);
     setBusy(true);
     let assistantIdx = -1;
     setMessages((m) => {
@@ -797,10 +801,10 @@ export default function ChatPage() {
     }
     if (sideConvId) return;
     const parentModelId = [...messages].reverse().find((message) => message.role === "assistant" && message.modelId)?.modelId;
-    const parentModel = models.find((model) => model.id === parentModelId) ?? selectedModel;
+    const parentEntry = resolveModelEntry(providers, parentModelId) ?? selectedModel;
     try {
       const branch = await api.branchConversation(convId);
-      setSideModel(parentModel);
+      setSideModelKey(parentEntry?.key);
       setSideConvId(branch.id);
       bumpConversations();
     } catch (error: any) {
@@ -824,7 +828,7 @@ export default function ChatPage() {
 
       {/* 消息流 */}
       <div ref={scrollRef} onMouseUp={handleSelection} onMouseDown={() => setQuoteBtn(null)} className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="mx-auto max-w-4xl space-y-6">
           {messages.length === 0 && (
             <div className="island-dot-pattern animate-float-in rounded-[2rem] border border-white bg-white/55 px-5 py-16 text-center text-claude-muted shadow-soft">
               <Sparkles size={40} className="mx-auto mb-3 text-claude-accent" />
@@ -978,7 +982,7 @@ export default function ChatPage() {
 
       {/* 资源生成快捷栏 */}
       <div className="border-t bg-claude-panel/50 px-4 py-2">
-        <div className="mx-auto max-w-3xl flex flex-wrap items-center justify-center gap-1.5">
+        <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-center gap-1.5">
           {RESOURCE_ACTIONS.map((a) => {
             const selected = pendingResource === a.type;
             return (
@@ -1020,7 +1024,7 @@ export default function ChatPage() {
 
       {/* 输入区 — AI coding 风格单卡片容器 */}
       <div className="border-t bg-claude-bg px-4 py-3">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-4xl">
           {quote && (
             <div className="mb-2 flex items-start gap-2 rounded-2xl border border-claude-accent/30 bg-claude-accentSoft/50 px-3 py-2 text-xs text-claude-ink">
               <QuoteIcon size={13} className="mt-0.5 shrink-0 text-claude-accent" />
@@ -1056,8 +1060,8 @@ export default function ChatPage() {
                   ? "已选择「互动刷题」，输入想练习的主题后按回车开始（也可直接回车）…"
                   : "输入问题或学习目标…（Shift+Enter 换行；选中回答文本可引用）"
               }
-              rows={2}
-              className="border-0 shadow-none focus:ring-0 rounded-none min-h-[48px] max-h-40 bg-transparent"
+              rows={3}
+              className="border-0 shadow-none focus:ring-0 rounded-none min-h-[72px] max-h-52 bg-transparent"
             />
             {/* 底部工具栏：左附件 + 右发送按钮 + 模型名 */}
             <div className="flex items-center justify-between border-t border-claude-border/60 bg-claude-panel/35 px-3 py-2">
@@ -1070,6 +1074,7 @@ export default function ChatPage() {
                 <Paperclip size={16} />
               </button>
               <div className="flex items-center gap-2">
+                <ReasoningSelector />
                 <ModelSelector />
                 <button
                   onClick={() => send()}
@@ -1088,8 +1093,8 @@ export default function ChatPage() {
       {sideConvId && (
         <SideChatPanel
           conversationId={sideConvId}
-          model={sideModel}
-          onClose={() => { setSideConvId(null); setSideModel(undefined); }}
+          modelKey={sideModelKey}
+          onClose={() => { setSideConvId(null); setSideModelKey(undefined); }}
         />
       )}
       <ExploreDock />

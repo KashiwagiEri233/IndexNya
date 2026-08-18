@@ -16,6 +16,7 @@ class ChatModelConfig(BaseModel):
     model: str
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    reasoning_effort: Optional[str] = None  # off/minimal/low/medium/high/xhigh/max，透传给支持的接口
 
 
 class BranchConversationRequest(BaseModel):

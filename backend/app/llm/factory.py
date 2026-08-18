@@ -32,6 +32,16 @@ def _model_settings() -> tuple[str, str, str]:
     return model, base_url, api_key
 
 
+_REASONING_LEVELS = {"minimal", "low", "medium", "high", "xhigh", "max"}
+
+
+def _reasoning_effort() -> str | None:
+    """当前请求的推理强度（off/minimal/low/medium/high/xhigh/max）；off 或未设置时不传参。"""
+    override = _active_model.get() or {}
+    effort = str(override.get("reasoning_effort") or "").strip().lower()
+    return effort if effort in _REASONING_LEVELS else None
+
+
 def get_llm() -> AsyncOpenAI:
     """获取当前请求对应的 OpenAI 兼容异步客户端。"""
     _, base_url, api_key = _model_settings()
@@ -86,6 +96,9 @@ async def chat_complete_message(
         kwargs["tools"] = tools
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
+    effort = _reasoning_effort()
+    if effort:
+        kwargs["extra_body"] = {"reasoning_effort": effort}
     resp = await llm.chat.completions.create(**kwargs)
     message = resp.choices[0].message
     content = message.content or ""
@@ -127,6 +140,9 @@ async def chat_stream(
         kwargs["tools"] = tools
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
+    effort = _reasoning_effort()
+    if effort:
+        kwargs["extra_body"] = {"reasoning_effort": effort}
     stream = await llm.chat.completions.create(**kwargs)
     tool_parts: dict[int, dict] = {}
     async for chunk in stream:

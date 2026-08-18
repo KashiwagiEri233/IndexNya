@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
 import { api, type CardRow } from "@/lib/api";
 import { openExploreCard, restoreExploreCard } from "@/lib/explore";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 const NAV = [
   { to: "/chat", label: "学习对话", icon: Sparkles, tone: "text-island-coral" },
@@ -99,6 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const cardVersion = useAppStore((s) => s.cardVersion);
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const bumpCards = useAppStore((s) => s.bumpCards);
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const navigate = useNavigate();
 
   const { data: conversations } = useQuery({
@@ -340,13 +342,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="relative m-3 rounded-2xl border border-white bg-white/75 p-3 shadow-soft">
-          <button type="button" onClick={() => navigate("/settings")} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
+          <button type="button" onClick={() => setSettingsOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
             <Settings size={13} /> 设置
           </button>
         </div>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-hidden bg-claude-bg">{children}</main>
+      <SettingsDialog />
     </div>
   );
 }

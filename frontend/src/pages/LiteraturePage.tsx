@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollText, UploadCloud, FileText, Loader2, Trash2, Wand2, X } from "lucide-react";
 import { api, type Literature, type LiteratureDetail, type ChatTerm } from "@/lib/api";
-import { useAppStore } from "@/stores/app";
+import { useAppStore, requestModelOf } from "@/stores/app";
 import { Markdown } from "@/components/chat/Markdown";
 import { ExploreDock } from "@/components/explore/ExploreDock";
 import { openExploreCard, resolveModel } from "@/lib/explore";
@@ -54,7 +54,7 @@ export default function LiteraturePage() {
         const model = resolveModel();
         const updated = await api.extractLiteratureTerms(
           lit.id,
-          model ? { id: model.id, name: model.name, model: model.model, base_url: model.baseUrl, api_key: model.apiKey } : undefined
+          requestModelOf(model)
         );
         if (updated.terms.length > 0) bumpLiteratures();
         else alert("术语提取完成，但未识别到合适术语（可换一个模型重试）。");
@@ -74,7 +74,7 @@ export default function LiteraturePage() {
     setExtractingId(lit.id);
     try {
       const model = resolveModel();
-      const updated = await api.extractLiteratureTerms(lit.id, model ? { id: model.id, name: model.name, model: model.model, base_url: model.baseUrl, api_key: model.apiKey } : undefined);
+      const updated = await api.extractLiteratureTerms(lit.id, requestModelOf(model));
       bumpLiteratures();
       if (updated.terms.length === 0) alert("未识别到合适术语，可换一个模型重试。");
     } catch (e: any) {
