@@ -61,15 +61,7 @@ Write-Step "环境检查"
 $PyCmd = Get-PythonCommand
 Test-Node
 
-# ---------- 1. 配置文件 ----------
-$EnvFile = Join-Path $Root ".env"
-if (-not (Test-Path $EnvFile)) {
-  Copy-Item (Join-Path $Root ".env.example") $EnvFile
-  Write-Host "已自动生成 .env（模板来自 .env.example）" -ForegroundColor Yellow
-  Write-Host "如需服务端固定模型，请编辑 .env 填写 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL；也可以直接在网页「设置」中添加模型。" -ForegroundColor Yellow
-}
-
-# ---------- 2. 后端依赖 ----------
+# ---------- 1. 后端依赖 ----------
 Write-Step "后端准备 (FastAPI :$BackendPort)"
 if (-not (Test-Path $VenvPython)) {
   Write-Host "首次运行：创建 Python 虚拟环境..."
@@ -90,7 +82,7 @@ if (-not $SkipInstall -and ($Refresh -or -not (Test-Path $InstallMarker))) {
   }
 }
 
-# ---------- 3. 前端依赖 ----------
+# ---------- 2. 前端依赖 ----------
 Write-Step "前端准备 (Vite :$FrontendPort)"
 if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) {
   Write-Host "首次运行：安装前端依赖（npm install，可能需要几分钟）..."

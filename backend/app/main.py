@@ -56,5 +56,4 @@ def health() -> dict:
     return {
         "status": "ok",
         "app_name": settings.app_name,
-        "llm_ready": settings.llm_ready,
     }

@@ -162,7 +162,7 @@ async function j<T>(resp: Response): Promise<T> {
 
 export const api = {
   async health() {
-    return j<{ status: string; llm_ready: boolean }>(
+    return j<{ status: string; app_name: string }>(
       await fetch(`${API_BASE}/health`)
     );
   },

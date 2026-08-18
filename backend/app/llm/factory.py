@@ -1,4 +1,4 @@
-"""LLM Provider 封装 — 支持前端传入或 .env 显式配置的 OpenAI 兼容模型。"""
+"""LLM Provider 封装 — 使用前端「设置」中配置并传入的 OpenAI 兼容模型。"""
 from __future__ import annotations
 
 from contextvars import ContextVar
@@ -24,11 +24,11 @@ def reset_active_model(token) -> None:
 
 def _model_settings() -> tuple[str, str, str]:
     override = _active_model.get() or {}
-    model = str(override.get("model") or settings.llm_model).strip()
-    base_url = str(override.get("base_url") or settings.llm_base_url).strip()
-    api_key = str(override.get("api_key") or settings.llm_api_key).strip()
+    model = str(override.get("model") or "").strip()
+    base_url = str(override.get("base_url") or "").strip()
+    api_key = str(override.get("api_key") or "").strip()
     if not model or not base_url or not api_key:
-        raise RuntimeError("未配置可用模型，请先在前端添加并选择模型，或在 .env 中显式配置 LLM_MODEL、LLM_BASE_URL 和 LLM_API_KEY")
+        raise RuntimeError("未配置可用模型，请先在网页左下角「设置」中添加提供商并选择模型")
     return model, base_url, api_key
 
 

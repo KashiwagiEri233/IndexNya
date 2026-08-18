@@ -95,7 +95,6 @@ class TutorAskRequest(BaseModel):
 class HealthOut(BaseModel):
     status: str
     app_name: str
-    llm_ready: bool
 
 
 # ===== 层级对话（探索卡片） =====

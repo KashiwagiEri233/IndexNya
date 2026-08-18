@@ -1,4 +1,4 @@
-"""应用配置 — 通过 .env 注入，所有密钥集中管理。"""
+"""应用配置 — 通过 .env 注入（可选；模型配置统一在前端「设置」中完成，无需 .env）。"""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -8,7 +8,7 @@ from typing import List
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# .env 位于项目根目录（backend/ 的上一级）
+# .env 位于项目根目录（backend/ 的上一级）；缺失时全部使用默认值
 _ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
@@ -19,13 +19,6 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
-
-    # ===== 1. LLM (OpenAI 兼容协议) =====
-    # 不内置默认模型；可以由前端在每次请求中选择，也可以通过 .env 显式配置服务端模型。
-    # 图片理解（上传图片提问）直接复用该文本模型的多模态能力，无需单独配置。
-    llm_api_key: str = ""
-    llm_base_url: str = ""
-    llm_model: str = ""
 
     # ===== 应用配置 =====
     app_name: str = "Index 学习岛"
@@ -41,10 +34,6 @@ class Settings(BaseSettings):
     @property
     def cors_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
-
-    @property
-    def llm_ready(self) -> bool:
-        return bool(self.llm_api_key and self.llm_base_url and self.llm_model)
 
 
 @lru_cache
