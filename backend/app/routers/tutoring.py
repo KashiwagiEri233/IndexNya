@@ -8,14 +8,13 @@ from ..agents.tutor import TutorAgent
 from ..db import get_db
 from ..models import Resource
 from ..schemas import TutorAskRequest
-from ..services.profile_service import get_latest_profile, profile_to_dict
 
 router = APIRouter()
 
 
 @router.post("/ask")
 async def ask(payload: TutorAskRequest, db: Session = Depends(get_db)) -> dict:
-    profile = profile_to_dict(get_latest_profile(db, payload.student_id))
+    profile: dict = {}  # 学习画像功能已移除
     context = ""
     if payload.context_resource_id:
         r = db.get(Resource, payload.context_resource_id)

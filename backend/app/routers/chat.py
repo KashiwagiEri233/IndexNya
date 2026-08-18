@@ -1,9 +1,11 @@
-"""对话流路由 — SSE 流式输出，融合画像构建与多智能体协同。
+"""对话流路由 — SSE 流式输出，融合多智能体协同。
 
 事件类型：
   token   — 增量文本
   meta    — 会话/学生/资源元信息
-  profile — 画像更新通知
+  plan    — 需求判定结果
+  route   — 路由决策
+  quiz    — 互动刷题出题/小结
   done    — 结束
   error   — 错误
 """
@@ -42,11 +44,6 @@ from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest, M
 from ..services.conversation_service import (
     branch_conversation as create_branch_conversation,
     delete_conversation_tree,
-)
-from ..services.profile_service import (
-    extract_profile_from_history,
-    get_latest_profile,
-    profile_to_dict,
 )
 from ..services.universe_service import get_anchor_context
 
@@ -214,20 +211,8 @@ def _format_resource_preview(r) -> str:
         return header + "```mermaid\n" + content["mermaid"] + "\n```"
     if content.get("questions"):
         qs = content["questions"]
-        return header + f"共 {len(qs)} 道题，请在资源库查看完整题库。"
-    return header + "资源已生成，请在资源库查看。"
-
-
-DEFAULT_PROFILE_AGENT_PROMPT = """你是一位学习画像构建智能体，同时也是学习顾问。当前正在和学生对话。
-
-你的双重职责：
-1. 自然地了解学生的专业、目标、基础、易错点、学习节奏、兴趣（构建画像）
-2. 回答学生的学习问题，给出有针对性的建议
-
-当学生提供了足够画像信息（自然地说出专业、目标、一个薄弱点、偏好），可在回复末尾加上一行：
-[[PROFILE_READY]]
-
-回复用中文，语气亲切像辅导员。一次不要问太多问题。"""
+        return header + f"共 {len(qs)} 道题，请查看完整题库。"
+    return header + "资源已生成。"
 
 
 async def _stream_chat_impl(
@@ -278,7 +263,7 @@ async def _stream_chat_impl(
         .all()
     )
     history = [{"role": m.role, "content": m.content} for m in history_rows[:-1]]  # 排除刚存的当前消息
-    profile = profile_to_dict(get_latest_profile(db, student.id))
+    profile: dict = {}  # 学习画像功能已移除，agent 上下文不再注入画像
 
     # 4. 阶段A：确定需求（三层递进，命中即止，尽量不调用 LLM）
     #    ① 显式指定 → ② 关键词快速路由 → ③ 轻量意图判定（小 prompt）
@@ -433,8 +418,6 @@ async def _stream_chat_impl(
         })
         agent = MainAgent()
         extra_context_parts: list[str] = []
-        if profile:
-            extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
         if payload.context:
             extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
         extra_context_parts.append(
@@ -467,8 +450,6 @@ async def _stream_chat_impl(
         exiting = active_quiz is not None and is_quiz_exit(payload.message)
         try:
             messages: list[dict[str, Any]] = [{"role": "system", "content": QUIZ_SYSTEM_PROMPT}]
-            if profile:
-                messages.append({"role": "system", "content": f"学生画像：{json.dumps(profile, ensure_ascii=False)}"})
             for h in history[-8:]:
                 messages.append({"role": h.get("role", "user"), "content": str(h.get("content", ""))[:1500]})
             messages.append({"role": "user", "content": payload.message})
@@ -539,8 +520,6 @@ async def _stream_chat_impl(
         # 普通对话由 MainAgent 直接流式回答，不派发 conversation subagent。
         agent = MainAgent()
         extra_context_parts: list[str] = []
-        if profile:
-            extra_context_parts.append(f"当前学生画像：{json.dumps(profile, ensure_ascii=False)}")
         if payload.context:
             extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
         extra_context = "\n\n".join(extra_context_parts)
@@ -559,9 +538,6 @@ async def _stream_chat_impl(
             return
 
     full_text = "".join(full_text_parts)
-    # 去掉遗留的画像标记后再提取专有名词，避免标记进入术语列表。
-    if "[[PROFILE_READY]]" in full_text:
-        full_text = full_text.replace("[[PROFILE_READY]]", "").strip()
 
     # ===== 先保存消息并立即结束用户可见的流式状态（done 前置），后处理并行补齐 =====
     asst_msg = Message(
@@ -569,7 +545,6 @@ async def _stream_chat_impl(
         role="assistant",
         content=full_text,
         meta={
-            "profile_updated": False,
             "mode": payload.mode,
             "action": action,
             "skill": skill.name if skill else None,
@@ -585,7 +560,7 @@ async def _stream_chat_impl(
 
     yield _sse("done", {"conversation_id": conv.id, "student_id": student.id})
 
-    # ===== 后处理：验收 / 术语 / 画像 并行执行，不再阻塞 done =====
+    # ===== 后处理：验收 / 术语 并行执行，不再阻塞 done =====
 
     async def _post_acceptance() -> dict:
         if action in {"resource", "tutor"} and payload.model:
@@ -597,24 +572,8 @@ async def _stream_chat_impl(
             return []
         return await extract_terms(full_text)
 
-    async def _post_profile():
-        # 仅 chat 动作触发（resource/tutor/skill 不触发，避免干扰画像）。
-        # 只取最近 30 条、每条 600 字，控制输入 token。
-        if action != "chat":
-            return None
-        recent_rows = history_rows[-30:]
-        conv_text = "\n".join(
-            f"{m.role}: {(m.content or '')[:600]}" for m in recent_rows
-        ) + f"\nassistant: {full_text[:2000]}"
-        try:
-            return await extract_profile_from_history(db, student.id, conv_text)
-        except Exception as e:
-            logger.warning("profile extraction failed: %s", e)
-            return None
-
     acc_task = asyncio.create_task(_post_acceptance())
     terms_task = asyncio.create_task(_post_terms())
-    profile_task = asyncio.create_task(_post_profile())
 
     try:
         acceptance = await acc_task
@@ -626,12 +585,6 @@ async def _stream_chat_impl(
     except Exception:
         logger.exception("term extraction failed")
         terms = []
-    profile = None
-    try:
-        profile = await profile_task
-    except Exception:
-        logger.exception("profile extraction failed")
-        profile = None
 
     yield _sse("acceptance", {"agent": "main", **acceptance})
     yield _sse("progress", {
@@ -644,19 +597,10 @@ async def _stream_chat_impl(
     if terms:
         yield _sse("terms", {"terms": terms})
 
-    profile_updated = profile is not None
-    if profile:
-        yield _sse("profile", {
-            "version": profile.version,
-            "dimensions": profile.dimensions,
-            "summary": profile.raw_summary,
-        })
-
-    # 回填消息 meta（terms / acceptance / profile_updated）
+    # 回填消息 meta（terms / acceptance）
     meta = dict(asst_msg.meta or {})
     meta["terms"] = terms
     meta["acceptance"] = dict(acceptance)
-    meta["profile_updated"] = profile_updated
     asst_msg.meta = meta
     db.commit()
 

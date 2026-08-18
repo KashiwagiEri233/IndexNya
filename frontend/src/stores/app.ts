@@ -42,10 +42,6 @@ interface AppState {
   setSelectedModelId: (id: string) => void;
 
   // 触发路径/画像/错题本刷新的计数器
-  profileVersion: number;
-  bumpProfile: () => void;
-  pathVersion: number;
-  bumpPath: () => void;
   conversationVersion: number;
   bumpConversations: () => void;
   cardVersion: number;
@@ -114,10 +110,7 @@ export const useAppStore = create<AppState>()(
       }),
       setSelectedModelId: (id) => set({ selectedModelId: id }),
 
-      profileVersion: 0,
-      bumpProfile: () => set({ profileVersion: Date.now() }),
-      pathVersion: 0,
-      bumpPath: () => set({ pathVersion: Date.now() }),
+      // 触发对话/错题本等刷新的计数器
       conversationVersion: 0,
       bumpConversations: () => set({ conversationVersion: Date.now() }),
       cardVersion: 0,

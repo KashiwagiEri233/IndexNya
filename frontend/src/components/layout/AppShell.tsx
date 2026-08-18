@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
+import { BookOpen, User, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -11,9 +11,6 @@ const NAV = [
   { to: "/practice", label: "错题本", icon: ClipboardCheck, tone: "text-island-lavender" },
   { to: "/literature", label: "文献阅读", icon: ScrollText, tone: "text-island-butter" },
   { to: "/universe", label: "思维宇宙", icon: Orbit, tone: "text-island-lavender" },
-  { to: "/profile", label: "学习画像", icon: User, tone: "text-island-teal" },
-  { to: "/path", label: "成长路径", icon: MapIcon, tone: "text-island-mint" },
-  { to: "/dashboard", label: "学习评估", icon: BarChart3, tone: "text-island-coral" },
 ];
 
 const CARD_TYPE_META: Record<string, { icon: any; label: string; color: string }> = {
@@ -105,12 +102,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const bumpCards = useAppStore((s) => s.bumpCards);
   const navigate = useNavigate();
-
-  const { data: profile } = useQuery({
-    queryKey: ["profile", studentId],
-    queryFn: () => (studentId ? api.getProfile(studentId) : null),
-    enabled: !!studentId,
-  });
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations", studentId, conversationVersion],
@@ -360,7 +351,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-[10px] font-bold text-claude-muted">准备好开始学习了吗？</div>
             </div>
           </div>
-          {profile && <div className="mt-2 text-[10px] font-extrabold text-claude-accent">画像版本 v{profile.version}</div>}
           <button type="button" onClick={() => navigate("/settings")} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
             <Settings size={13} /> 设置
           </button>

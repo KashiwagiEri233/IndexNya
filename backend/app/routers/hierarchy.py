@@ -23,7 +23,6 @@ from ..llm.factory import chat_stream, reset_active_model, set_active_model
 from ..models import Conversation, ExploreCard, Message, Student
 from ..schemas import CardOut, ExploreRequest
 from ..services.conversation_service import delete_conversation_tree
-from ..services.profile_service import get_latest_profile, profile_to_dict
 from ..services.universe_service import get_anchor_context
 
 router = APIRouter()
@@ -72,14 +71,12 @@ def _mode_prompt(mode: str, term: str) -> str:
     return template.format(term=term)
 
 
-def _context_block(payload: ExploreRequest, profile: dict, anchors: str) -> str:
+def _context_block(payload: ExploreRequest, anchors: str) -> str:
     parts: list[str] = []
     if payload.explanation:
         parts.append(f"已有简要解释：{payload.explanation[:300]}")
     if payload.context:
         parts.append(f"来源上下文（学生点击的位置）：\n{payload.context[:8000]}")
-    if profile:
-        parts.append(f"学生画像：{json.dumps(profile, ensure_ascii=False)}")
     if anchors:
         parts.append(anchors)
     return "\n\n".join(parts)
@@ -119,7 +116,6 @@ async def _stream_explore(db: Session, payload: ExploreRequest) -> AsyncIterator
     token = set_active_model(payload.model.model_dump(exclude_none=True) if payload.model else None)
     mode = payload.mode if payload.mode in ("child", "related", "branch") else "child"
     term = (payload.term or "").strip()[:120]
-    profile = profile_to_dict(get_latest_profile(db, payload.student_id))
     anchors = get_anchor_context(db, payload.student_id, term)
     branch_conv: Conversation | None = None
     card: ExploreCard | None = None
@@ -184,7 +180,7 @@ async def _stream_explore(db: Session, payload: ExploreRequest) -> AsyncIterator
             "source_message_id": payload.source_message_id,
         })
 
-        ctx = _context_block(payload, profile, anchors)
+        ctx = _context_block(payload, anchors)
         messages: list[dict[str, Any]] = [{"role": "system", "content": _mode_prompt(mode, term)}]
         if ctx:
             messages.append({"role": "system", "content": ctx})

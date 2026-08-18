@@ -38,7 +38,6 @@ class ImageReaderAgent(BaseAgent):
         self,
         image_bytes: bytes,
         question: str,
-        profile: dict,
         content_type: str = "image/jpeg",
         history: list[dict] | None = None,
     ) -> dict[str, Any]:
@@ -61,12 +60,10 @@ class ImageReaderAgent(BaseAgent):
             {"type": "image_url", "image_url": {"url": data_url}},
         ]
 
-        ctx = f"学生画像：{profile}"
         try:
             answer = await chat_complete(
                 [
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "system", "content": ctx},
                     {"role": "user", "content": user_content},
                 ],
                 temperature=0.5,

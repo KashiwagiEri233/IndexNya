@@ -11,8 +11,7 @@ from ..agents.lecturer import LecturerAgent
 from ..agents.mindmap import MindmapAgent
 from ..agents.quizmaster import QuizmasterAgent
 from ..agents.reader import ReaderAgent
-from ..models import Profile, Resource
-from .profile_service import get_latest_profile, profile_to_dict
+from ..models import Resource
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ async def generate_resource(
         raise ValueError(f"unknown resource type: {resource_type}")
 
     prefix, agent_cls = _GENERATORS[resource_type]
-    profile = profile_to_dict(get_latest_profile(db, student_id))
+    profile: dict = {}  # 学习画像功能已移除
 
     # 拼接对话历史作为 agent 上下文（保留多轮对话信息）
     history_text = ""

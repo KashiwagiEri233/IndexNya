@@ -38,15 +38,12 @@ logger = logging.getLogger(__name__)
 
 
 # 注册路由
-from .routers import assessment, chat, hierarchy, image_understanding, literature, paths, practice, profile, resources, skills, students, tutoring, universe  # noqa: E402
+from .routers import chat, hierarchy, image_understanding, literature, practice, resources, skills, students, tutoring, universe  # noqa: E402
 
 app.include_router(students.router, prefix="/api/students", tags=["students"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
-app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 app.include_router(resources.router, prefix="/api/resources", tags=["resources"])
-app.include_router(paths.router, prefix="/api/paths", tags=["paths"])
 app.include_router(tutoring.router, prefix="/api/tutor", tags=["tutor"])
-app.include_router(assessment.router, prefix="/api/assessment", tags=["assessment"])
 app.include_router(image_understanding.router, prefix="/api/image", tags=["image"])
 app.include_router(hierarchy.router, prefix="/api/hierarchy", tags=["hierarchy"])
 app.include_router(literature.router, prefix="/api/literature", tags=["literature"])

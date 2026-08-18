@@ -375,8 +375,6 @@ export default function ChatPage() {
   const student = useAppStore((s) => s.student);
   const convId = useAppStore((s) => s.convId);
   const setConvId = useAppStore((s) => s.setConvId);
-  const bumpProfile = useAppStore((s) => s.bumpProfile);
-  const bumpPath = useAppStore((s) => s.bumpPath);
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const setPendingInsight = useAppStore((s) => s.setPendingInsight);
   const models = useAppStore((s) => s.models);
@@ -603,9 +601,7 @@ export default function ChatPage() {
               return copy;
             });
           },
-          onProfile: () => bumpProfile(),
-          onDone: (d) => {
-            setMessages((m) => {
+          onDone: (d) => {            setMessages((m) => {
               const copy = [...m];
               if (assistantIdx >= 0 && copy[assistantIdx]) {
                 copy[assistantIdx] = { ...copy[assistantIdx], streaming: false };
@@ -650,7 +646,6 @@ export default function ChatPage() {
     const assistantIdx = messages.length + 1;
     try {
       const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: toRequestModel(selectedModel) });
-      bumpPath();
       let preview = "";
       if (r.type === "mindmap" && r.content?.markdown) {
         preview = `✅ 已生成思维导图：\n\n${r.content.markdown}`;

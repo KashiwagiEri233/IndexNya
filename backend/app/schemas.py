@@ -21,24 +21,6 @@ class StudentOut(BaseModel):
         from_attributes = True
 
 
-# ===== 画像 =====
-class ProfileOut(BaseModel):
-    id: int
-    student_id: int
-    version: int
-    dimensions: dict[str, Any]
-    raw_summary: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ProfileUpdate(BaseModel):
-    """手动微调画像维度。"""
-    dimensions: dict[str, Any]
-
-
 # ===== 对话 =====
 class ChatModelConfig(BaseModel):
     """前端可选的 OpenAI 兼容模型配置。密钥仅用于当前请求，不写入数据库。"""
@@ -65,7 +47,7 @@ class ChatRequest(BaseModel):
     message: str
     resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code
     skill: Optional[str] = None
-    mode: str = "chat"  # chat / profile / resource / tutor
+    mode: str = "chat"  # chat / resource / tutor / quiz_session
     model: Optional[ChatModelConfig] = None
     context: Optional[str] = None
 
@@ -117,59 +99,12 @@ class ResourceOut(BaseModel):
         from_attributes = True
 
 
-# ===== 学习路径 =====
-class PathPlanRequest(BaseModel):
-    student_id: int
-    goal: str
-
-
-class PathOut(BaseModel):
-    id: int
-    student_id: int
-    goal: str
-    nodes: list[dict[str, Any]]
-    version: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # ===== 智能辅导 =====
 class TutorAskRequest(BaseModel):
     student_id: int
     question: str
     context_resource_id: Optional[int] = None
     modality: str = "text"  # text / video（推荐相关视频）
-
-
-# ===== 学习效果评估 =====
-class AssessmentTrack(BaseModel):
-    student_id: int
-    resource_id: Optional[int] = None
-    status: str = "not_started"
-    score: Optional[float] = None
-    time_spent_min: float = 0.0
-    feedback: Optional[str] = None
-
-
-class AssessmentOut(BaseModel):
-    id: int
-    student_id: int
-    dimension: str
-    score: float
-    evidence: Optional[dict] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class AssessmentDashboard(BaseModel):
-    student_id: int
-    dimensions: list[dict[str, Any]]  # [{name, score, evidence}]
-    total_score: float
-    recommendation: str
 
 
 # ===== 通用 =====

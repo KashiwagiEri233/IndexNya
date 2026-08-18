@@ -11,22 +11,18 @@ from .coder import CoderAgent
 from .image_reader import ImageReaderAgent
 from .lecturer import LecturerAgent
 from .mindmap import MindmapAgent
-from .pathplanner import PathPlannerAgent
-from .profiler import ProfilerAgent
 from .quizmaster import QuizmasterAgent
 from .reader import ReaderAgent
 from .tutor import TutorAgent
 
 # 角色注册表
 AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
-    "profiler": ProfilerAgent,
     "lecture": LecturerAgent,
     "mindmap": MindmapAgent,
     "quiz": QuizmasterAgent,
     "reading": ReaderAgent,
     "code": CoderAgent,
     "image_reader": ImageReaderAgent,
-    "pathplanner": PathPlannerAgent,
     "tutor": TutorAgent,
 }
 
@@ -62,5 +58,5 @@ async def route_intent(
             return explicit_mode
         if explicit_mode in RESOURCE_AGENT_MAP:
             return RESOURCE_AGENT_MAP[explicit_mode]
-    # 默认对话走画像构建 + 通用 chat（在 chat router 里直接处理）
-    return "profiler"
+    # 默认对话走通用 chat（在 chat router 里直接处理）
+    return "chat"

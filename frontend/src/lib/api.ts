@@ -8,15 +8,6 @@ export interface Student {
   created_at: string;
 }
 
-export interface Profile {
-  id: number;
-  student_id: number;
-  version: number;
-  dimensions: Record<string, any>;
-  raw_summary: string;
-  created_at: string;
-}
-
 export interface Message {
   id: number;
   role: "user" | "assistant" | "system" | "tool";
@@ -78,34 +69,6 @@ export interface PracticeRecord {
   is_correct: boolean | null;
   asked_at: string;
   answered_at: string | null;
-}
-
-export interface LearningPath {
-  id: number;
-  student_id: number;
-  goal: string;
-  nodes: PathNode[];
-  version: number;
-  created_at: string;
-}
-
-export interface PathNode {
-  step: number;
-  title: string;
-  description: string;
-  resource_types: string[];
-  resource_ids: number[];
-  estimated_hours: number;
-  depends_on: number[];
-  checkpoint: string;
-}
-
-export interface AssessmentDashboard {
-  student_id: number;
-  dimensions: { name: string; key: string; score: number; evidence: string }[];
-  total_score: number;
-  recommendation: string;
-  raw_stats?: Record<string, any>;
 }
 
 /** 探索卡片（层级对话） */
@@ -211,12 +174,6 @@ export const api = {
     return j<Student[]>(await fetch(`${API_BASE}/students`));
   },
 
-  async getProfile(studentId: number) {
-    const r = await fetch(`${API_BASE}/profile/${studentId}`);
-    if (r.status === 404) return null;
-    return j<Profile>(r);
-  },
-
   async getConversations(studentId: number) {
     return j<Conversation[]>(
       await fetch(`${API_BASE}/conversations?student_id=${studentId}`)
@@ -288,22 +245,6 @@ export const api = {
     );
   },
 
-  async planPath(studentId: number, goal: string) {
-    return j<LearningPath>(
-      await fetch(`${API_BASE}/paths/plan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_id: studentId, goal }),
-      })
-    );
-  },
-
-  async getPath(studentId: number) {
-    const r = await fetch(`${API_BASE}/paths/${studentId}`);
-    if (r.status === 404) return null;
-    return j<LearningPath | null>(r);
-  },
-
   async tutorAsk(payload: {
     student_id: number;
     question: string;
@@ -345,29 +286,6 @@ export const api = {
     return resp.json();
   },
 
-  async trackProgress(payload: {
-    student_id: number;
-    resource_id?: number;
-    status: string;
-    score?: number;
-    time_spent_min?: number;
-    feedback?: string;
-  }) {
-    return j<{ id: number; status: string }>(
-      await fetch(`${API_BASE}/assessment/track`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-    );
-  },
-
-  async getAssessment(studentId: number) {
-    return j<AssessmentDashboard>(
-      await fetch(`${API_BASE}/assessment/${studentId}`)
-    );
-  },
-
   async listSkills() {
     return j<Skill[]>(await fetch(`${API_BASE}/skills`));
   },
@@ -388,7 +306,6 @@ export const api = {
       onMeta?: (d: any) => void;
       onRoute?: (d: any) => void;
       onToken?: (t: string) => void;
-      onProfile?: (d: any) => void;
       onResource?: (d: any) => void;
       onSkill?: (d: any) => void;
       onQuiz?: (d: any) => void;
@@ -443,9 +360,6 @@ export const api = {
             break;
           case "token":
             handlers.onToken?.(parsed.text);
-            break;
-          case "profile":
-            handlers.onProfile?.(parsed);
             break;
           case "resource":
             handlers.onResource?.(parsed);

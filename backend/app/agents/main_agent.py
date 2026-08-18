@@ -28,7 +28,7 @@ class MainAgent:
 - 用户想互动刷题、一题一题被提问着做题（如"刷题""陪我练题""逐题练习"）时 action=quiz_session。
 - 用户请求与下列可用技能匹配时 action=skill，skill 必须填列表中的确切 name。
 - 用户提出具体疑问、求讲解、求解答时 action=tutor。
-- 其余（闲聊、画像交流、宽泛咨询、不确定）action=chat。
+- 其余（闲聊、宽泛咨询、不确定）action=chat。
 
 可用技能：
 {skill_catalog}

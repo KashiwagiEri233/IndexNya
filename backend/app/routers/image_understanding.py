@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from ..agents.image_reader import ImageReaderAgent
 from ..db import get_db
-from ..services.profile_service import get_latest_profile, profile_to_dict
 
 router = APIRouter()
 
@@ -29,7 +28,6 @@ async def understand(
     if len(image_bytes) > MAX_SIZE:
         raise HTTPException(400, f"image too large: {len(image_bytes)} bytes (max 4MB)")
 
-    profile = profile_to_dict(get_latest_profile(db, student_id))
     agent = ImageReaderAgent()
-    result = await agent.understand(image_bytes, question, profile, content_type=image.content_type)
+    result = await agent.understand(image_bytes, question, content_type=image.content_type)
     return result

@@ -8,7 +8,6 @@ from ..db import get_db
 from ..llm.factory import reset_active_model, set_active_model
 from ..models import Understanding
 from ..schemas import AnchorOut, EvaluateRequest, UnderstandingOut, UniverseGraphOut
-from ..services.profile_service import get_latest_profile, profile_to_dict
 from ..services.universe_service import (
     build_graph,
     create_or_update_understanding,
@@ -28,7 +27,7 @@ async def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)) -> d
     if not concept or not summary:
         raise HTTPException(400, "概念与理解内容不能为空")
 
-    profile = profile_to_dict(get_latest_profile(db, payload.student_id))
+    profile: dict = {}  # 学习画像功能已移除
     token = set_active_model(payload.model.model_dump(exclude_none=True) if payload.model else None)
     try:
         verdict = await evaluate_summary(concept, summary, profile)
