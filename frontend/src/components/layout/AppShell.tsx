@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers } from "lucide-react";
+import { BookOpen, User, FileText, Map as MapIcon, BarChart3, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { openExploreCard, restoreExploreCard } from "@/lib/explore";
 
 const NAV = [
   { to: "/chat", label: "学习对话", icon: Sparkles, tone: "text-island-coral" },
-  { to: "/resources", label: "资源岛", icon: FileText, tone: "text-island-sky" },
+  { to: "/practice", label: "错题本", icon: ClipboardCheck, tone: "text-island-lavender" },
   { to: "/literature", label: "文献阅读", icon: ScrollText, tone: "text-island-butter" },
   { to: "/universe", label: "思维宇宙", icon: Orbit, tone: "text-island-lavender" },
   { to: "/profile", label: "学习画像", icon: User, tone: "text-island-teal" },

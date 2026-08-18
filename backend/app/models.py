@@ -195,3 +195,24 @@ class Understanding(Base):
     anchors: Mapped[list] = mapped_column(JSON, default=list)  # 相关联的已掌握概念名
     source: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PracticeRecord(Base):
+    """互动刷题历史 — 每道题一条记录（类似错题本）。
+
+    is_correct: True=答对 / False=答错 / None=未作答（会话结束时仍 pending）
+    """
+
+    __tablename__ = "practice_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+    conversation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+    topic: Mapped[str] = mapped_column(String(128), default="")
+    question: Mapped[str] = mapped_column(Text, default="")
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    answer: Mapped[str] = mapped_column(Text, default="")
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    is_correct: Mapped[Optional[bool]] = mapped_column(nullable=True, default=None)
+    asked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    answered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)

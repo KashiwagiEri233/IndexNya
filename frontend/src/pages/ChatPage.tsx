@@ -375,7 +375,6 @@ export default function ChatPage() {
   const student = useAppStore((s) => s.student);
   const convId = useAppStore((s) => s.convId);
   const setConvId = useAppStore((s) => s.setConvId);
-  const bumpResources = useAppStore((s) => s.bumpResources);
   const bumpProfile = useAppStore((s) => s.bumpProfile);
   const bumpPath = useAppStore((s) => s.bumpPath);
   const bumpConversations = useAppStore((s) => s.bumpConversations);
@@ -401,6 +400,18 @@ export default function ChatPage() {
   useEffect(() => {
     api.listSkills().then(setSkills).catch(() => setSkills([]));
   }, []);
+
+  // 错题本「重练错题」一键直达：自动发送拼好的消息并清空待发状态
+  const pendingPracticeMessage = useAppStore((s) => s.pendingPracticeMessage);
+  const setPendingPracticeMessage = useAppStore((s) => s.setPendingPracticeMessage);
+  useEffect(() => {
+    if (pendingPracticeMessage && student) {
+      const text = pendingPracticeMessage.text;
+      setPendingPracticeMessage(null);
+      void send(text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPracticeMessage]);
 
   // 编辑 / 引用 / 删除状态
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -593,7 +604,6 @@ export default function ChatPage() {
             });
           },
           onProfile: () => bumpProfile(),
-          onResource: () => bumpResources(),
           onDone: (d) => {
             setMessages((m) => {
               const copy = [...m];
@@ -640,11 +650,10 @@ export default function ChatPage() {
     const assistantIdx = messages.length + 1;
     try {
       const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: toRequestModel(selectedModel) });
-      bumpResources();
       bumpPath();
       let preview = "";
       if (r.type === "mindmap" && r.content?.markdown) {
-        preview = `✅ 已生成思维导图，[查看可视化树状图](/resources)\n\n${r.content.markdown}`;
+        preview = `✅ 已生成思维导图：\n\n${r.content.markdown}`;
       } else if (r.content?.markdown) {
         preview = r.content.markdown;
       } else if (r.content?.mermaid) {

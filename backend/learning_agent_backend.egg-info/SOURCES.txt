@@ -42,6 +42,7 @@ app/services/assessment_service.py
 app/services/conversation_service.py
 app/services/path_service.py
 app/services/profile_service.py
+app/services/quiz_service.py
 app/services/resource_service.py
 app/services/universe_service.py
 app/skills/__init__.py

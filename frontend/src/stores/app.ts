@@ -41,9 +41,7 @@ interface AppState {
   removeModel: (id: string) => void;
   setSelectedModelId: (id: string) => void;
 
-  // 触发资源/路径/画像刷新的计数器
-  resourceVersion: number;
-  bumpResources: () => void;
+  // 触发路径/画像/错题本刷新的计数器
   profileVersion: number;
   bumpProfile: () => void;
   pathVersion: number;
@@ -56,10 +54,16 @@ interface AppState {
   bumpLiteratures: () => void;
   universeVersion: number;
   bumpUniverse: () => void;
+  practiceVersion: number;
+  bumpPractice: () => void;
 
   // 从对话带入思维宇宙的候选理解（跨页传递，不持久化）
   pendingInsight: { concept: string; summary: string } | null;
   setPendingInsight: (v: { concept: string; summary: string } | null) => void;
+
+  // 错题本「重练错题」跨页传递到对话页（不持久化）
+  pendingPracticeMessage: { text: string } | null;
+  setPendingPracticeMessage: (v: { text: string } | null) => void;
 
   // 探索卡片坞（层级对话）
   exploreCards: ExploreCardState[];
@@ -110,8 +114,6 @@ export const useAppStore = create<AppState>()(
       }),
       setSelectedModelId: (id) => set({ selectedModelId: id }),
 
-      resourceVersion: 0,
-      bumpResources: () => set({ resourceVersion: Date.now() }),
       profileVersion: 0,
       bumpProfile: () => set({ profileVersion: Date.now() }),
       pathVersion: 0,
@@ -124,9 +126,14 @@ export const useAppStore = create<AppState>()(
       bumpLiteratures: () => set({ literatureVersion: Date.now() }),
       universeVersion: 0,
       bumpUniverse: () => set({ universeVersion: Date.now() }),
+      practiceVersion: 0,
+      bumpPractice: () => set({ practiceVersion: Date.now() }),
 
       pendingInsight: null,
       setPendingInsight: (v) => set({ pendingInsight: v }),
+
+      pendingPracticeMessage: null,
+      setPendingPracticeMessage: (v) => set({ pendingPracticeMessage: v }),
 
       exploreCards: [],
       exploreAdd: (card) => set((state) => ({ exploreCards: [...state.exploreCards, card] })),

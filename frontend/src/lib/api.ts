@@ -66,6 +66,20 @@ export interface Skill {
   description: string;
 }
 
+export interface PracticeRecord {
+  id: number;
+  student_id: number;
+  conversation_id: number | null;
+  topic: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+  is_correct: boolean | null;
+  asked_at: string;
+  answered_at: string | null;
+}
+
 export interface LearningPath {
   id: number;
   student_id: number;
@@ -241,15 +255,19 @@ export const api = {
     );
   },
 
-  async listResources(studentId: number, type?: string) {
-    const q = new URLSearchParams({ student_id: String(studentId) });
-    if (type) q.set("type", type);
-    return j<Resource[]>(await fetch(`${API_BASE}/resources?${q}`));
+  async listPractice(studentId: number, filter: "all" | "wrong" | "right" | "pending" = "all") {
+    return j<PracticeRecord[]>(await fetch(`${API_BASE}/practice?student_id=${studentId}&filter=${filter}`));
   },
 
-  async deleteResource(resourceId: number) {
+  async deletePractice(recordId: number) {
     return j<{ deleted_id: number }>(
-      await fetch(`${API_BASE}/resources/${resourceId}`, { method: "DELETE" })
+      await fetch(`${API_BASE}/practice/${recordId}`, { method: "DELETE" })
+    );
+  },
+
+  async clearPractice(studentId: number) {
+    return j<{ deleted_count: number }>(
+      await fetch(`${API_BASE}/practice?student_id=${studentId}`, { method: "DELETE" })
     );
   },
 

@@ -37,7 +37,7 @@ from ..services.quiz_service import (
 )
 from ..skills.manager import get_skill, list_skills
 from ..db import get_db
-from ..models import Conversation, ExploreCard, Message, Student
+from ..models import Conversation, ExploreCard, Message, PracticeRecord, Student
 from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest, MessageUpdate
 from ..services.conversation_service import (
     branch_conversation as create_branch_conversation,
@@ -67,6 +67,8 @@ def _bilibili_search_markdown(topic: str) -> str:
 
 # 关键词快速路由：命中即确定需求，跳过 LLM。必须同时出现“生成意图 + 资源名词”，避免误判。
 _KEYWORD_ROUTES: list[tuple[re.Pattern, str, str | None]] = [
+    # 重练错题（错题本一键重练）：显式意图，优先级最高
+    (re.compile(r"(?:重新|重练|重做|把|用).{0,8}(?:错题|这些题)"), "quiz_session", None),
     (re.compile(r"(?:生成|制作|做份?|创建|写|出|给我|帮我|整理|梳理).{0,8}(?:讲解(?:文档|讲义)|讲义|教学文档|讲解资料|课件)"), "resource", "lecture"),
     (re.compile(r"(?:生成|画|做份?|给我|帮我|整理|梳理|列).{0,8}(?:思维导图|脑图|知识(?:结构|框架|树))"), "resource", "mindmap"),
     (re.compile(r"(?:生成|出|做份?|给我|帮我|编).{0,8}(?:题目|练习题|习题|测试题|试卷|考卷)"), "resource", "quiz"),
@@ -148,6 +150,41 @@ def _active_quiz_session(db: Session, conversation_id: int) -> dict | None:
     if isinstance(session, dict) and session.get("active"):
         return session
     return None
+
+
+def _record_practice_question(db: Session, student_id: int, conversation_id: int, session: dict, args: dict) -> None:
+    """把新出的题插入错题本（pending 状态，作答后回填对错）。"""
+    try:
+        db.add(PracticeRecord(
+            student_id=student_id,
+            conversation_id=conversation_id,
+            topic=str(session.get("topic") or "")[:60],
+            question=str(args.get("question") or "")[:4000],
+            options=args.get("options") or [],
+            answer=str(args.get("answer") or "")[:2000],
+            explanation=str(args.get("explanation") or "")[:2000],
+            is_correct=None,
+        ))
+        db.commit()
+    except Exception as e:
+        logger.warning("practice record insert failed: %s", e)
+
+
+def _mark_last_practice_answered(db: Session, conversation_id: int, is_correct: bool) -> None:
+    """把该会话最近一条未作答的错题本记录回填对错与作答时间。"""
+    try:
+        record = (
+            db.query(PracticeRecord)
+            .filter(PracticeRecord.conversation_id == conversation_id, PracticeRecord.is_correct.is_(None))
+            .order_by(PracticeRecord.id.desc())
+            .first()
+        )
+        if record:
+            record.is_correct = bool(is_correct)
+            record.answered_at = datetime.utcnow()
+            db.commit()
+    except Exception as e:
+        logger.warning("practice record update failed: %s", e)
 
 
 def _friendly_model_test_error(error: Exception) -> str:
@@ -426,7 +463,7 @@ async def _stream_chat_impl(
             "status": "running",
             "detail": "互动刷题中，正在出题/批改…",
         })
-        quiz_session = active_quiz if active_quiz is not None else new_session()
+        quiz_session = active_quiz if active_quiz is not None else new_session(topic=route.get("topic") or payload.message)
         exiting = active_quiz is not None and is_quiz_exit(payload.message)
         try:
             messages: list[dict[str, Any]] = [{"role": "system", "content": QUIZ_SYSTEM_PROMPT}]
@@ -455,6 +492,10 @@ async def _stream_chat_impl(
                 }
             else:
                 apply_tool_args(quiz_session, answer_question)
+                # 错题本落库：先回填上一题的对错，再插入本题 pending 记录
+                if answer_question.get("previous_correct") is not None:
+                    _mark_last_practice_answered(db, conv.id, bool(answer_question["previous_correct"]))
+                _record_practice_question(db, student.id, conv.id, quiz_session, answer_question)
                 index = quiz_session.get("index", 0)
                 question = answer_question.get("question", "")
                 options = answer_question.get("options") or []

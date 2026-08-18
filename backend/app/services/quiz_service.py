@@ -65,13 +65,14 @@ QUIZ_EXIT_PATTERN = r"(?:结束|不做了|不练了|不做题了|退出|够了|�
 SESSION_KEY = "quiz_session"
 
 
-def new_session() -> dict[str, Any]:
+def new_session(topic: str = "") -> dict[str, Any]:
     return {
         "active": True,
+        "topic": (topic or "")[:60],
         "index": 0,          # 已出的题数
         "score": 0,          # 答对题数
         "total": None,       # 计划题数（模型自定，可为空）
-        "items": [],         # [{"question", "options", "correct"}]
+        "items": [],         # [{"question", "options", "answer", "explanation", "correct"}]
     }
 
 
@@ -92,6 +93,8 @@ def apply_tool_args(session: dict[str, Any], args: dict[str, Any]) -> None:
     items.append({
         "question": args.get("question", ""),
         "options": args.get("options") or [],
+        "answer": args.get("answer", ""),
+        "explanation": args.get("explanation", ""),
         "correct": bool(args["previous_correct"]) if args.get("previous_correct") is not None else None,
     })
     session["items"] = items
@@ -104,6 +107,7 @@ def close_session(session: dict[str, Any]) -> None:
 def serialize(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "active": bool(session.get("active", False)),
+        "topic": session.get("topic") or "",
         "index": int(session.get("index", 0)),
         "score": int(session.get("score", 0)),
         "total": session.get("total"),
