@@ -27,7 +27,6 @@ class AgentContext:
     conversation_id: int | None
     profile: dict[str, Any]
     extra: str = ""
-    image_model_config: dict[str, Any] | None = None
 
 
 @dataclass
@@ -75,7 +74,6 @@ async def _run_resource(task: AgentTask, context: AgentContext) -> AgentResult:
         task.topic,
         conversation_id=context.conversation_id,
         extra={"instruction": task.instruction} if task.instruction else None,
-        image_model_config=context.image_model_config,
     )
     return AgentResult(resource=resource, data={"resource_id": resource.id, "resource_type": resource.type})
 
@@ -83,6 +81,6 @@ async def _run_resource(task: AgentTask, context: AgentContext) -> AgentResult:
 def build_default_scheduler() -> AgentScheduler:
     scheduler = AgentScheduler()
     scheduler.register("tutor", _run_tutor)
-    for resource_type in ("lecture", "mindmap", "quiz", "reading", "code", "illustration", "ppt"):
+    for resource_type in ("lecture", "mindmap", "quiz", "reading", "code"):
         scheduler.register(resource_type, _run_resource)
     return scheduler

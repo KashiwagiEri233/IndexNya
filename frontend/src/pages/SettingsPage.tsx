@@ -63,10 +63,8 @@ function ModelSettingsSection({ type, title, description, models, selectedId, on
 export default function SettingsPage() {
   const models = useAppStore((s) => s.models);
   const selectedModelId = useAppStore((s) => s.selectedModelId);
-  const selectedImageModelId = useAppStore((s) => s.selectedImageModelId);
   const setSelectedModelId = useAppStore((s) => s.setSelectedModelId);
-  const setSelectedImageModelId = useAppStore((s) => s.setSelectedImageModelId);
   return (
-    <div className="h-full overflow-y-auto"><header className="island-header justify-start gap-2"><Settings2 size={18} className="text-claude-accent" /><h1 className="font-semibold">设置</h1></header><div className="mx-auto max-w-4xl space-y-5 p-5"><ModelSettingsSection type="chat" title="对话模型" description="用于学习对话、辅导回答和专有名词子对话。" models={models.filter((model) => model.type !== "image")} selectedId={selectedModelId} onSelect={setSelectedModelId} /><ModelSettingsSection type="image" title="图片生成模型" description="用于教学插图生成，需要支持 OpenAI 兼容的 images.generate 接口。" models={models.filter((model) => model.type === "image")} selectedId={selectedImageModelId} onSelect={setSelectedImageModelId} /></div></div>
+    <div className="h-full overflow-y-auto"><header className="island-header justify-start gap-2"><Settings2 size={18} className="text-claude-accent" /><h1 className="font-semibold">设置</h1></header><div className="mx-auto max-w-4xl space-y-5 p-5"><ModelSettingsSection type="chat" title="对话模型" description="用于学习对话、辅导回答、图片理解（需支持多模态的模型）和专有名词子对话。" models={models.filter((model) => model.type !== "image")} selectedId={selectedModelId} onSelect={setSelectedModelId} /></div></div>
   );
 }

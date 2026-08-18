@@ -22,28 +22,10 @@ class Settings(BaseSettings):
 
     # ===== 1. LLM (OpenAI 兼容协议) =====
     # 不内置默认模型；可以由前端在每次请求中选择，也可以通过 .env 显式配置服务端模型。
+    # 图片理解（上传图片提问）直接复用该文本模型的多模态能力，无需单独配置。
     llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
-
-    # ===== 2. 讯飞文生图 tti API =====
-
-    # https://www.xfyun.cn/doc/spark/ImageGeneration.html
-    # 鉴权：HMAC-SHA256 通用签名（app_id + api_key + api_secret）
-    image_app_id: str = ""
-    image_api_key: str = ""
-    image_api_secret: str = ""
-    image_host: str = "spark-api.cn-huabei-1.xf-yun.com"
-    image_path: str = "/v2.1/tti"
-    image_width: int = 1024
-    image_height: int = 1024
-
-    # ===== 4. 讯飞图片理解 API（WebSocket）=====
-    # https://www.xfyun.cn/doc/spark/ImageUnderstanding.html
-    # 与文生图 tti 同组凭证（控制台同一服务）
-    # 鉴权：HMAC-SHA256 通用签名；协议：wss
-    image_understanding_path: str = "/v2.1/image"
-    image_understanding_domain: str = "imagev3"
 
     # ===== 应用配置 =====
     app_name: str = "Index 学习岛"
@@ -63,11 +45,6 @@ class Settings(BaseSettings):
     @property
     def llm_ready(self) -> bool:
         return bool(self.llm_api_key and self.llm_base_url and self.llm_model)
-
-    @property
-    def image_ready(self) -> bool:
-        return bool(self.image_app_id and self.image_api_key and self.image_api_secret
-                    and not self.image_app_id.startswith("your-"))
 
 
 @lru_cache

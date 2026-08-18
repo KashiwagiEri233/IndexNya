@@ -26,7 +26,6 @@ async def generate(
             payload.topic,
             conversation_id=payload.conversation_id,
             extra=payload.extra,
-            image_model_config=payload.image_model.model_dump(exclude_none=True) if payload.image_model else None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -52,7 +51,7 @@ def get_one(resource_id: int, db: Session = Depends(get_db)) -> ResourceOut:
 
 @router.delete("/{resource_id}")
 def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> dict:
-    """删除资源记录，并清理本地生成的图片/PPT文件。"""
+    """删除资源记录，并清理遗留的本地生成文件（图片/PPT 等历史资源）。"""
     from pathlib import Path
 
     from ..models import Resource
@@ -71,33 +70,3 @@ def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> dict:
     db.delete(resource)
     db.commit()
     return {"deleted_id": resource_id}
-
-
-@router.get("/{resource_id}/file")
-def get_file(resource_id: int, db: Session = Depends(get_db)):
-    """获取 illustration 资源生成的图片文件。"""
-    from pathlib import Path
-
-    from fastapi.responses import FileResponse
-
-    from ..models import Resource
-    r = db.get(Resource, resource_id)
-    if not r:
-        raise HTTPException(404, "resource not found")
-    content = r.content or {}
-    if r.type == "illustration":
-        file_path = content.get("image_path")
-        media_type = "image/png"
-        default_filename = "image.png"
-        not_found_message = "image file not found on disk"
-    elif r.type == "ppt":
-        file_path = content.get("ppt_path")
-        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        default_filename = "learning.pptx"
-        not_found_message = "ppt file not found on disk"
-    else:
-        raise HTTPException(400, "resource has no downloadable file")
-    if not file_path or not Path(file_path).exists():
-        raise HTTPException(404, not_found_message)
-    filename = (r.meta or {}).get("filename") or default_filename
-    return FileResponse(path=file_path, media_type=media_type, filename=filename)

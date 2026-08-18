@@ -60,6 +60,12 @@ export interface Resource {
   created_at: string;
 }
 
+export interface Skill {
+  name: string;
+  title: string;
+  description: string;
+}
+
 export interface LearningPath {
   id: number;
   student_id: number;
@@ -254,7 +260,6 @@ export const api = {
     conversation_id?: number;
     extra?: Record<string, any>;
     model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
-    image_model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
   }) {
     return j<Resource>(
       await fetch(`${API_BASE}/resources/generate`, {
@@ -345,6 +350,10 @@ export const api = {
     );
   },
 
+  async listSkills() {
+    return j<Skill[]>(await fetch(`${API_BASE}/skills`));
+  },
+
   /** SSE 流式对话。回调接收事件。 */
   async chatStream(
     payload: {
@@ -352,9 +361,9 @@ export const api = {
       student_id?: number;
       message: string;
       resource_type?: string;
+      skill?: string;
       mode?: string;
       model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
-      image_model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
       context?: string;
     },
     handlers: {
@@ -363,6 +372,8 @@ export const api = {
       onToken?: (t: string) => void;
       onProfile?: (d: any) => void;
       onResource?: (d: any) => void;
+      onSkill?: (d: any) => void;
+      onQuiz?: (d: any) => void;
       onTerms?: (d: any) => void;
       onPlan?: (d: any) => void;
       onProgress?: (d: any) => void;
@@ -420,6 +431,12 @@ export const api = {
             break;
           case "resource":
             handlers.onResource?.(parsed);
+            break;
+          case "skill":
+            handlers.onSkill?.(parsed);
+            break;
+          case "quiz":
+            handlers.onQuiz?.(parsed);
             break;
           case "terms":
             handlers.onTerms?.(parsed);

@@ -7,10 +7,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..agents.coder import CoderAgent
-from ..agents.illustrator import IllustratorAgent
 from ..agents.lecturer import LecturerAgent
 from ..agents.mindmap import MindmapAgent
-from ..agents.pptist import PPTistAgent
 from ..agents.quizmaster import QuizmasterAgent
 from ..agents.reader import ReaderAgent
 from ..models import Profile, Resource
@@ -25,8 +23,6 @@ _GENERATORS = {
     "quiz": ("练习题库", QuizmasterAgent),
     "reading": ("拓展阅读", ReaderAgent),
     "code": ("代码实操", CoderAgent),
-    "illustration": ("教学插图", IllustratorAgent),
-    "ppt": ("教学PPT", PPTistAgent),
 }
 
 
@@ -37,7 +33,6 @@ async def generate_resource(
     topic: str,
     conversation_id: int | None = None,
     extra: dict[str, Any] | None = None,
-    image_model_config: dict[str, Any] | None = None,
 ) -> Resource:
     """统一资源生成入口。"""
     if resource_type not in _GENERATORS:
@@ -102,23 +97,11 @@ async def generate_resource(
         elif resource_type == "code":
             text = await agent_cls().generate(topic, profile, extra=extra_str)
             content = {"markdown": text}
-        elif resource_type == "illustration":
-            content = await agent_cls().generate(topic, profile, image_model=image_model_config)
-        elif resource_type == "ppt":
-            content = await agent_cls().generate(topic, profile, extra=extra_str)
         else:
             content = {}
 
         r.content = content
         r.status = "completed"
-        # illustration 资源：讯飞 tti 返回 base64，落盘后用后端文件端点访问
-        if resource_type == "illustration" and content.get("image_path"):
-            r.file_url = f"/api/resources/{r.id}/file"
-            r.meta = {"filename": content.get("filename") or "image.png"}
-        # 本地 PPT 文件通过统一文件接口下载。
-        if resource_type == "ppt" and content.get("ppt_path"):
-            r.file_url = f"/api/resources/{r.id}/file"
-            r.meta = {"filename": content.get("filename") or "learning.pptx"}
     except Exception as e:
         logger.exception("resource generation failed: %s", resource_type)
         r.status = "failed"

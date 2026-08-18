@@ -9,11 +9,9 @@ from typing import Any, Optional
 from .base import BaseAgent
 from .coder import CoderAgent
 from .image_reader import ImageReaderAgent
-from .illustrator import IllustratorAgent
 from .lecturer import LecturerAgent
 from .mindmap import MindmapAgent
 from .pathplanner import PathPlannerAgent
-from .pptist import PPTistAgent
 from .profiler import ProfilerAgent
 from .quizmaster import QuizmasterAgent
 from .reader import ReaderAgent
@@ -27,8 +25,6 @@ AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
     "quiz": QuizmasterAgent,
     "reading": ReaderAgent,
     "code": CoderAgent,
-    "illustration": IllustratorAgent,
-    "ppt": PPTistAgent,
     "image_reader": ImageReaderAgent,
     "pathplanner": PathPlannerAgent,
     "tutor": TutorAgent,
@@ -41,8 +37,6 @@ RESOURCE_AGENT_MAP: dict[str, str] = {
     "quiz": "quiz",
     "reading": "reading",
     "code": "code",
-    "illustration": "illustration",
-    "ppt": "ppt",
 }
 
 

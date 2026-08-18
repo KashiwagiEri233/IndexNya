@@ -52,6 +52,28 @@ async def chat_complete(
     tool_choice: Optional[str] = None,
 ) -> str:
     """非流式补全，返回完整文本。"""
+    content, _ = await chat_complete_message(
+        messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        tools=tools,
+        tool_choice=tool_choice,
+    )
+    return content
+
+
+async def chat_complete_message(
+    messages: list[dict[str, Any]],
+    *,
+    temperature: float = 0.7,
+    max_tokens: int = 4096,
+    tools: Optional[list[dict]] = None,
+    tool_choice: Optional[str] = None,
+) -> tuple[str, list[dict]]:
+    """非流式补全，返回 (content, tool_calls)。
+
+    tool_calls 为 [{id, name, arguments(str)}]；模型未调用工具时为空列表。
+    """
     llm = get_llm()
     model, _, _ = _model_settings()
     kwargs: dict[str, Any] = dict(
@@ -65,7 +87,17 @@ async def chat_complete(
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
     resp = await llm.chat.completions.create(**kwargs)
-    return resp.choices[0].message.content or ""
+    message = resp.choices[0].message
+    content = message.content or ""
+    tool_calls: list[dict] = []
+    for call in (message.tool_calls or []):
+        try:
+            name = call.function.name
+            args = call.function.arguments or "{}"
+        except AttributeError:
+            continue
+        tool_calls.append({"id": getattr(call, "id", None), "name": name, "arguments": args})
+    return content, tool_calls
 
 
 async def chat_stream(

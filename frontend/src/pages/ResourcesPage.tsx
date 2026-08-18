@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Image as ImageIcon, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Presentation, Download, ExternalLink, Trash2 } from "lucide-react";
+import { FileText, Code, ListChecks, BookOpen, Map as MapIcon, Loader2, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { api, type Resource } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { MindmapTree } from "@/components/resources/MindmapTree";
@@ -15,11 +15,9 @@ const TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
   quiz: { label: "练习题库", icon: ListChecks, color: "text-green-600" },
   reading: { label: "拓展阅读", icon: BookOpen, color: "text-amber-600" },
   code: { label: "代码实操", icon: Code, color: "text-cyan-600" },
-  illustration: { label: "教学插图", icon: ImageIcon, color: "text-pink-600" },
-  ppt: { label: "教学PPT", icon: Presentation, color: "text-orange-600" },
 };
 
-const FILTERS = ["all", "lecture", "mindmap", "quiz", "reading", "code", "illustration", "ppt"];
+const FILTERS = ["all", "lecture", "mindmap", "quiz", "reading", "code"];
 
 function ResourceCard({ r, onDelete }: { r: Resource; onDelete: (resource: Resource) => void }) {
   const meta = TYPE_META[r.type] ?? { label: r.type, icon: FileText, color: "" };
@@ -62,38 +60,6 @@ function ResourceBody({ r }: { r: Resource }) {
   }
   if (r.status === "processing") {
     return <p className="text-sm text-claude-muted">生成中…</p>;
-  }
-  if (r.type === "illustration" && r.file_url) {
-    return <img src={r.file_url} alt={r.title} className="w-full rounded-md max-h-80 object-contain" />;
-  }
-  if (r.type === "ppt" && r.file_url) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Presentation size={20} className="text-orange-600" />
-          <span className="text-sm font-medium">本地生成 PPT</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <a href={r.file_url} target="_blank" rel="noreferrer"
-             className="inline-flex items-center gap-1.5 rounded-md bg-claude-accent text-white px-3 py-1.5 text-sm hover:bg-claude-accentHover">
-            <Download size={14} />
-            下载 .pptx
-          </a>
-          <a href={r.file_url} target="_blank" rel="noreferrer"
-             className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-sm hover:bg-claude-panel">
-            <ExternalLink size={14} />
-            新窗口打开
-          </a>
-        </div>
-        {r.content?.query && (
-          <details className="text-xs">
-            <summary className="cursor-pointer text-claude-muted">查看生成 query</summary>
-            <pre className="mt-1 p-2 bg-claude-panel rounded whitespace-pre-wrap">{r.content.query}</pre>
-          </details>
-        )}
-        <p className="text-xs text-claude-muted">文件由本地模板生成并保存在当前服务端。</p>
-      </div>
-    );
   }
   // 思维导图：优先用解析后的树结构渲染，回退到 Markdown
   if (r.type === "mindmap") {

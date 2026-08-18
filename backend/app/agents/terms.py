@@ -92,7 +92,7 @@ async def _llm_extract(sample: str, max_terms: int) -> list[dict[str, str]]:
                 {"role": "user", "content": _EXTRACT_PROMPT.format(max_terms=max_terms, sample=sample)},
             ],
             temperature=0.1,
-            max_tokens=1500,
+            max_tokens=700,
         )
         cleaned = (raw or "").strip()
         if cleaned.startswith("```"):
@@ -143,7 +143,7 @@ async def _llm_judge(sample: str, candidates: list[dict[str, str]]) -> list[dict
                 {"role": "user", "content": _JUDGE_PROMPT.format(candidates=listing, sample=sample[:6000])},
             ],
             temperature=0.0,
-            max_tokens=800,
+            max_tokens=400,
         )
         data = _parse_json_object(raw)
         keep = data.get("keep")
@@ -362,11 +362,13 @@ async def extract_terms(answer: str, max_terms: int = 10) -> list[dict[str, str]
     """
     if len(answer.strip()) < 24:
         return []
-    sample = answer[:12000]
+    sample = answer[:6000]
 
-    # 1+2. LLM 初提 + 复核判定
+    # 1+2. LLM 初提 + 复核判定（候选少时跳过复核，由本地归一化/过滤兜底）
     candidates = await _llm_extract(sample, max_terms)
     if candidates:
+        if len(candidates) <= 5:
+            return candidates[:max_terms]
         judged = await _llm_judge(sample, candidates)
         if judged:
             return judged[:max_terms]

@@ -58,14 +58,15 @@ class ChatRequest(BaseModel):
     """流式对话请求。
 
     resource_type: 若提供，则本次对话路由到指定资源生成 agent
+    skill: 若提供，则本次对话显式使用该技能（技能名见 GET /api/skills）
     """
     conversation_id: Optional[int] = None
     student_id: Optional[int] = None
     message: str
-    resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code/illustration/ppt
+    resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code
+    skill: Optional[str] = None
     mode: str = "chat"  # chat / profile / resource / tutor
     model: Optional[ChatModelConfig] = None
-    image_model: Optional[ChatModelConfig] = None
     context: Optional[str] = None
 
 
@@ -96,11 +97,10 @@ class ConversationOut(BaseModel):
 class ResourceGenerateRequest(BaseModel):
     student_id: int
     conversation_id: Optional[int] = None
-    type: str  # lecture/mindmap/quiz/reading/code/illustration/ppt
+    type: str  # lecture/mindmap/quiz/reading/code
     topic: str
     extra: dict[str, Any] = Field(default_factory=dict)
     model: Optional[ChatModelConfig] = None
-    image_model: Optional[ChatModelConfig] = None
 
 
 class ResourceOut(BaseModel):
@@ -140,7 +140,7 @@ class TutorAskRequest(BaseModel):
     student_id: int
     question: str
     context_resource_id: Optional[int] = None
-    modality: str = "text"  # text / diagram / video（推荐相关视频）
+    modality: str = "text"  # text / video（推荐相关视频）
 
 
 # ===== 学习效果评估 =====

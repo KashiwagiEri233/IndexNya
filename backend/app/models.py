@@ -87,7 +87,7 @@ class Resource(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     conversation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("conversations.id"), nullable=True)
-    type: Mapped[str] = mapped_column(String(32))  # lecture/mindmap/quiz/reading/code/illustration/ppt
+    type: Mapped[str] = mapped_column(String(32))  # lecture/mindmap/quiz/reading/code
     title: Mapped[str] = mapped_column(String(256))
     content: Mapped[dict] = mapped_column(JSON, default=dict)  # 结构化内容
     file_url: Mapped[Optional[str]] = mapped_column(String(512), default=None)

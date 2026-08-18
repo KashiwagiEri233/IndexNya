@@ -9,7 +9,6 @@ from urllib.parse import quote
 
 from ..llm.factory import chat_complete
 from .base import BaseAgent
-from .illustrator import IllustratorAgent
 
 
 class TutorAgent(BaseAgent):
@@ -41,7 +40,7 @@ class TutorAgent(BaseAgent):
         )
         text = result.text
 
-        out: dict[str, Any] = {"text": text, "video_topic": None, "diagram": None}
+        out: dict[str, Any] = {"text": text, "video_topic": None}
 
         # 需要视频时只记录主题，实际由上层生成 Bilibili 搜索链接。
         if modality == "video" or "[需视频讲解" in text:
@@ -51,14 +50,5 @@ class TutorAgent(BaseAgent):
             out["video_url"] = "https://search.bilibili.com/all?keyword=" + quote(out["video_topic"][:80])
             text = re.sub(r"\s*\[需视频讲解[:：]\s*.+?\]", "", text).strip()
             out["text"] = text
-
-        # 图解模态：触发插画
-        if modality == "diagram":
-            try:
-                illustrator = IllustratorAgent()
-                diagram = await illustrator.generate(question, profile)
-                out["diagram"] = diagram
-            except Exception as e:
-                out["diagram"] = {"status": "failed", "error": str(e)}
 
         return out

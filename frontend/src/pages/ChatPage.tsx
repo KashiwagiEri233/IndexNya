@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Send, Sparkles, FileText, Map as MapIcon, Image as ImageIcon, Presentation, Loader2, Paperclip,
+  Send, Sparkles, FileText, Map as MapIcon, Loader2, Paperclip,
   Code, ListChecks, BookOpen, HelpCircle, PanelRight, GitBranch, X, Pencil, Trash2, Quote as QuoteIcon,
-  Brain, Search, ArrowUpRight, ArrowRight, ArrowDown,
+  Brain, Search, ArrowUpRight, ArrowRight, ArrowDown, Wand2, ClipboardCheck, PenLine,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Markdown } from "@/components/chat/Markdown";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { ExploreDock } from "@/components/explore/ExploreDock";
 import { openExploreCard } from "@/lib/explore";
-import { api, type ChatModel, type ChatTerm } from "@/lib/api";
+import { api, type ChatModel, type ChatTerm, type Skill } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
@@ -20,25 +20,27 @@ interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
-  route?: { action: string; resource_type?: string; topic?: string };
+  route?: { action: string; resource_type?: string; topic?: string; skill?: string };
   terms?: ChatTerm[];
   modelId?: string;
   progress?: { phase: string; agent: string; status: string; detail?: string };
   edited?: boolean;
+  /** 互动刷题卡片（由后端 quiz SSE 事件下发） */
+  quiz?: { action: "question" | "summary"; question?: string; options?: string[]; index?: number; score?: number; session?: any };
 }
 
 const ROUTE_LABELS: Record<string, string> = {
   lecture: "讲解文档", mindmap: "思维导图", quiz: "练习题库",
   reading: "拓展阅读", code: "代码实操",
-  illustration: "教学插图", ppt: "教学PPT",
 };
 
-// 快捷栏仅保留 5 个常用入口；其他智能体（题库/拓展阅读/代码/插图/辅导）由路由自动调用
+// 资源快捷入口（讲解/导图/题库/阅读/代码）；插图与 PPT 已移除
 const RESOURCE_ACTIONS = [
   { type: "lecture", label: "讲解文档", icon: FileText },
   { type: "mindmap", label: "思维导图", icon: MapIcon },
-  { type: "illustration", label: "图片生成", icon: ImageIcon },
-  { type: "ppt", label: "教学PPT", icon: Presentation },
+  { type: "quiz", label: "练习题库", icon: ListChecks },
+  { type: "reading", label: "拓展阅读", icon: BookOpen },
+  { type: "code", label: "代码实操", icon: Code },
 ] as const;
 
 // 欢迎页展示全部功能（含路由自动调用的智能体）
@@ -46,19 +48,62 @@ const ALL_FEATURES = [
   { label: "讲解文档", icon: FileText },
   { label: "思维导图", icon: MapIcon },
   { label: "练习题库", icon: ListChecks },
+  { label: "互动刷题", icon: ClipboardCheck },
   { label: "拓展阅读", icon: BookOpen },
   { label: "代码实操", icon: Code },
-  { label: "图片生成", icon: ImageIcon },
-  { label: "教学PPT", icon: Presentation },
   { label: "图片理解", icon: HelpCircle },
 ] as const;
 
-function isLocalIllustrationRequest(text: string) {
-  return /(?:生成|制作|画|做一张|创建).{0,12}(?:插图|配图|示意图)/.test(text);
-}
-
-function isLocalPptRequest(text: string) {
-  return /(?:生成|制作|做个|做一份|创建|导出).{0,12}(?:PPT|ppt|幻灯片|演示文稿|课件)/.test(text);
+/** 互动刷题卡片：展示选项按钮与结束入口；题目文本已随消息内容展示。 */
+function QuizCard({ quiz, onAnswer }: { quiz: NonNullable<ChatMsg["quiz"]>; onAnswer: (text: string) => void }) {
+  const answered = quiz.action === "summary";
+  const session = quiz.session as any;
+  const answeredCount = session?.index ?? quiz.index ?? 0;
+  const score = session?.score ?? quiz.score ?? 0;
+  return (
+    <div className={cn("mt-3 rounded-2xl border p-3 shadow-soft", answered ? "border-claude-border/70 bg-claude-panel/40" : "border-island-lavender/40 bg-white")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={cn("inline-flex items-center gap-1 text-xs font-bold", answered ? "text-claude-muted" : "text-island-lavender")}>
+          <ClipboardCheck size={13} /> {answered ? "练习结束" : `第 ${answeredCount} 题`}
+        </span>
+        {answered ? (
+          <span className="text-[10px] text-claude-muted">共作答 {answeredCount} 题 · 答对 {score} 题</span>
+        ) : (
+          <span className="text-[10px] text-claude-muted">已答对 {score} 题</span>
+        )}
+      </div>
+      {answered ? (
+        <p className="mt-2 text-xs text-claude-muted">本轮互动刷题已完成，批改与小结见上方消息。想继续可以再说「再来几题」。</p>
+      ) : (
+        <>
+          {quiz.options && quiz.options.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {quiz.options.map((opt, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onAnswer(`我的答案：${opt}`)}
+                  className="rounded-xl border bg-claude-panel/60 px-3 py-1.5 text-left text-xs transition-colors hover:border-island-lavender/50 hover:bg-island-lavender/10"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-claude-muted">{quiz.options?.length ? "点选项直接作答" : "在下方输入框输入答案后回车"}</span>
+            <button
+              type="button"
+              onClick={() => onAnswer("结束练习")}
+              className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold text-claude-muted transition-colors hover:bg-claude-panel"
+            >
+              结束练习
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function toRequestModel(model: ChatModel | undefined) {
@@ -87,6 +132,28 @@ function topicOf(message: ChatMsg): string {
   if (terms && terms.length > 0) return terms[0].text;
   const clean = message.content.replace(/[#*`>\-\[\]()]/g, "").trim();
   return clean.slice(0, 14) || "这段内容";
+}
+
+/** 把后端消息行映射为前端消息；互动刷题卡片从 meta.quiz_session 重建。 */
+function msgFromRow(m: any): ChatMsg {
+  const qs = m?.meta?.quiz_session;
+  const items = qs && Array.isArray(qs.items) ? qs.items : [];
+  const last = items[items.length - 1];
+  const quiz = qs
+    ? qs.active
+      ? { action: "question" as const, question: last?.question, options: last?.options ?? [], index: qs.index ?? 0, score: qs.score ?? 0, session: qs }
+      : { action: "summary" as const, index: qs.index ?? 0, score: qs.score ?? 0, session: qs }
+    : undefined;
+  return {
+    id: m.id,
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: m.content,
+    route: m.meta?.action ? { action: m.meta.action } : undefined,
+    terms: Array.isArray(m.meta?.terms) ? m.meta.terms : undefined,
+    modelId: m.meta?.model_id || undefined,
+    edited: Boolean(m.meta?.edited),
+    quiz,
+  };
 }
 
 function SideChatPanel({
@@ -315,19 +382,25 @@ export default function ChatPage() {
   const setPendingInsight = useAppStore((s) => s.setPendingInsight);
   const models = useAppStore((s) => s.models);
   const selectedModelId = useAppStore((s) => s.selectedModelId);
-  const selectedImageModelId = useAppStore((s) => s.selectedImageModelId);
   const selectedModel = models.find((model) => model.id === selectedModelId && model.type !== "image");
-  const selectedImageModel = models.find((model) => model.id === selectedImageModelId && model.type === "image");
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingResource, setPendingResource] = useState<string | null>(null);
+  const [pendingSkill, setPendingSkill] = useState<string | null>(null);
+  const [quizMode, setQuizMode] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [sideConvId, setSideConvId] = useState<number | null>(null);
   const [sideModel, setSideModel] = useState<ChatModel | undefined>();
   const scrollRef = useRef<HTMLDivElement>(null);
   // 首条消息创建新会话时，onMeta 会更新 convId；跳过这一次历史拉取，避免覆盖正在流式生成的本地消息。
   const skipHistoryLoadForRef = useRef<number | null>(null);
+
+  // 拉取可用技能目录（来源：backend/app/skills/*.md）
+  useEffect(() => {
+    api.listSkills().then(setSkills).catch(() => setSkills([]));
+  }, []);
 
   // 编辑 / 引用 / 删除状态
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -338,15 +411,7 @@ export default function ChatPage() {
   async function refreshMessages(targetConvId: number) {
     try {
       const rows = await api.getMessages(targetConvId);
-      setMessages(rows.map((m: any) => ({
-        id: m.id,
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-        route: m.meta?.action ? { action: m.meta.action } : undefined,
-        terms: Array.isArray(m.meta?.terms) ? m.meta.terms : undefined,
-        modelId: m.meta?.model_id || undefined,
-        edited: Boolean(m.meta?.edited),
-      })));
+      setMessages(rows.map(msgFromRow));
     } catch {
       /* 静默 */
     }
@@ -367,14 +432,7 @@ export default function ChatPage() {
     let cancelled = false;
     api.getMessages(convId).then((rows) => {
       if (cancelled) return;
-      setMessages(rows.map((m: any) => ({
-        id: m.id,
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-        terms: Array.isArray(m.meta?.terms) ? m.meta.terms : undefined,
-        modelId: m.meta?.model_id || undefined,
-        edited: Boolean(m.meta?.edited),
-      })));
+      setMessages(rows.map(msgFromRow));
     }).catch(() => {
       if (!cancelled) setMessages([]);
     });
@@ -426,27 +484,26 @@ export default function ChatPage() {
     });
   }
 
-  async function send() {
-    if (!input.trim() || busy || !student) return;
-    const text = input.trim();
-    const localPpt = pendingResource === "ppt" || isLocalPptRequest(text);
-    const localIllustration = pendingResource === "illustration" || isLocalIllustrationRequest(text);
-    if (!selectedModel && !localPpt && !localIllustration) {
+  async function send(textOverride?: string) {
+    const text = (textOverride ?? input).trim();
+    if (!text || busy || !student) return;
+    if (!selectedModel) {
       alert("请先添加并选择一个对话模型。");
       return;
     }
-    if (localIllustration && !selectedImageModel) {
-      alert("请先到设置中添加并选择图片生成模型。");
-      return;
-    }
-    // 如果选中了某个智能体，走资源生成分支
-    if (pendingResource) {
+    // 如果选中了某个资源智能体，走资源生成分支
+    if (!textOverride && pendingResource) {
       const type = pendingResource;
       setPendingResource(null);
       setInput("");
       await generateResource(type, text);
       return;
     }
+    // 显式点选了技能：走技能执行分支（chat 流式回答，按技能说明执行）
+    const skillToUse = (!textOverride && pendingSkill) || undefined;
+    if (pendingSkill) setPendingSkill(null);
+    const useQuizMode = !textOverride && quizMode;
+    if (quizMode) setQuizMode(false);
     setInput("");
     setQuote(null);
     const context = quote ? `被引用的内容：${quote}` : undefined;
@@ -465,8 +522,9 @@ export default function ChatPage() {
           conversation_id: convId ?? undefined,
           student_id: student.id,
           message: text,
-          model: localPpt || localIllustration ? undefined : toRequestModel(selectedModel),
-          image_model: localIllustration ? toRequestModel(selectedImageModel) : undefined,
+          skill: skillToUse,
+          mode: useQuizMode ? "quiz_session" : undefined,
+          model: toRequestModel(selectedModel),
           context,
         },
         {
@@ -481,7 +539,28 @@ export default function ChatPage() {
             setMessages((m) => {
               const copy = [...m];
               if (assistantIdx >= 0 && copy[assistantIdx]) {
-                copy[assistantIdx] = { ...copy[assistantIdx], route: { action: d.action, resource_type: d.resource_type, topic: d.topic } };
+                copy[assistantIdx] = { ...copy[assistantIdx], route: { action: d.action, resource_type: d.resource_type, skill: d.skill, topic: d.topic } };
+              }
+              return copy;
+            });
+          },
+          onSkill: (d) => {
+            // 技能徽标展示由 route 事件的 action=skill 承担；这里仅确保其可见。
+            setMessages((m) => {
+              const copy = [...m];
+              if (assistantIdx >= 0 && copy[assistantIdx]) {
+                const route = copy[assistantIdx].route ?? { action: "skill" };
+                copy[assistantIdx] = { ...copy[assistantIdx], route: { ...route, action: "skill", skill: route.skill ?? d?.skill } };
+              }
+              return copy;
+            });
+          },
+          onQuiz: (d) => {
+            // 互动刷题卡片：题目文本已随 token 流进入消息内容，这里仅挂载交互控件数据。
+            setMessages((m) => {
+              const copy = [...m];
+              if (assistantIdx >= 0 && copy[assistantIdx]) {
+                copy[assistantIdx] = { ...copy[assistantIdx], quiz: { action: d.action, question: d.question, options: Array.isArray(d.options) ? d.options : [], index: d.index ?? d.session?.index ?? 0, score: d.score ?? d.session?.score ?? 0, session: d.session } };
               }
               return copy;
             });
@@ -560,15 +639,11 @@ export default function ChatPage() {
     ]);
     const assistantIdx = messages.length + 1;
     try {
-      const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: type === "ppt" || type === "illustration" ? undefined : toRequestModel(selectedModel), image_model: type === "illustration" ? toRequestModel(selectedImageModel) : undefined });
+      const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: toRequestModel(selectedModel) });
       bumpResources();
       bumpPath();
       let preview = "";
-      if (r.type === "illustration" && r.file_url) {
-        preview = `✅ 已生成教学插图：![插图](${r.file_url})`;
-      } else if (r.type === "ppt" && r.file_url) {
-        preview = `✅ 已生成教学 PPT：[下载 .pptx](${r.file_url})\n\n> PPT 由 Index 学习岛本地模板生成。`;
-      } else if (r.type === "mindmap" && r.content?.markdown) {
+      if (r.type === "mindmap" && r.content?.markdown) {
         preview = `✅ 已生成思维导图，[查看可视化树状图](/resources)\n\n${r.content.markdown}`;
       } else if (r.content?.markdown) {
         preview = r.content.markdown;
@@ -777,6 +852,20 @@ export default function ChatPage() {
                   </div>
                 ))}
               </div>
+              {skills.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-[11px] font-bold text-claude-muted">可用技能</div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 max-w-lg mx-auto text-left">
+                    {skills.map((s) => (
+                      <button key={s.name} type="button" onClick={() => { setPendingSkill(pendingSkill === s.name ? null : s.name); if (pendingSkill !== s.name) setPendingResource(null); }} className={cn("card p-3 text-sm text-left", pendingSkill === s.name && "ring-2 ring-claude-accent/60")}>
+                        <Wand2 size={16} className="text-island-lavender mb-1" />
+                        <div className="font-medium">{s.title}</div>
+                        <div className="text-[10px] leading-4 text-claude-muted line-clamp-2">{s.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {messages.map((m, i) => (
@@ -810,6 +899,10 @@ export default function ChatPage() {
                             ? ROUTE_LABELS[m.route.resource_type || ""] || `${m.route.resource_type}`
                             : m.route.action === "tutor"
                             ? "辅导回答"
+                            : m.route.action === "skill"
+                            ? `技能：${m.route.skill ?? "通用技能"}`
+                            : m.route.action === "quiz_session"
+                            ? "互动刷题"
                             : "学习问答"}
                         </span>
                         <span className="text-[11px] text-claude-muted">回答</span>
@@ -823,6 +916,7 @@ export default function ChatPage() {
                         >
                           {m.content}
                         </Markdown>
+                        {m.quiz && <QuizCard quiz={m.quiz} onAnswer={(t) => send(t)} />}
                       </div>
                     ) : <span className="text-claude-muted">…</span>}
                   </>
@@ -919,7 +1013,7 @@ export default function ChatPage() {
               <button
                 key={a.type}
                 disabled={busy}
-                onClick={() => setPendingResource(selected ? null : a.type)}
+                onClick={() => { setPendingResource(selected ? null : a.type); if (!selected) setPendingSkill(null); }}
                 className={
                   "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
                   (selected
@@ -933,6 +1027,48 @@ export default function ChatPage() {
               </button>
             );
           })}
+          {/* 互动刷题入口：逐题作答（区别于一次性生成题库） */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => { setQuizMode(!quizMode); setPendingResource(null); setPendingSkill(null); }}
+            className={
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
+              (quizMode
+                ? "bg-island-lavender text-white border-island-lavender"
+                : "bg-white hover:bg-island-lavender/10 hover:border-island-lavender/40")
+            }
+            title={quizMode ? "已选择互动刷题，输入想练习的主题后发送" : "互动刷题：一题一题作答、即时批改"}
+          >
+            <PenLine size={13} />
+            刷题练习
+          </button>
+          {skills.length > 0 && (
+            <>
+              <span className="mx-1 h-4 w-px bg-claude-border/70" />
+              <span className="text-[10px] font-bold text-claude-muted">技能</span>
+              {skills.map((s) => {
+                const selected = pendingSkill === s.name;
+                return (
+                  <button
+                    key={s.name}
+                    disabled={busy}
+                    onClick={() => { setPendingSkill(selected ? null : s.name); if (!selected) setPendingResource(null); }}
+                    className={
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
+                      (selected
+                        ? "bg-island-lavender text-white border-island-lavender"
+                        : "bg-white hover:bg-island-lavender/10 hover:border-island-lavender/40")
+                    }
+                    title={selected ? `已选择技能「${s.title}」，输入主题后发送` : `使用技能「${s.title}」：${s.description}`}
+                  >
+                    <Wand2 size={13} />
+                    {s.title}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
 
@@ -970,6 +1106,10 @@ export default function ChatPage() {
                   ? "图片已选择，输入问题后点上传…"
                   : pendingResource
                   ? `已选择${RESOURCE_ACTIONS.find(a => a.type === pendingResource)?.label}，输入主题后按回车生成…`
+                  : pendingSkill
+                  ? `已选择技能「${skills.find(s => s.name === pendingSkill)?.title ?? pendingSkill}」，输入主题后按回车执行…`
+                  : quizMode
+                  ? "已选择「互动刷题」，输入想练习的主题后按回车开始（也可直接回车）…"
                   : "输入问题或学习目标…（Shift+Enter 换行；选中回答文本可引用）"
               }
               rows={2}
@@ -988,7 +1128,7 @@ export default function ChatPage() {
               <div className="flex items-center gap-2">
                 <ModelSelector />
                 <button
-                  onClick={send}
+                  onClick={() => send()}
                   disabled={busy || !input.trim() || !selectedModel}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-claude-accent text-white shadow-soft transition-all hover:-translate-y-0.5 hover:bg-claude-accentHover disabled:pointer-events-none disabled:opacity-40"
                   title="发送"
