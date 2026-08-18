@@ -6,6 +6,7 @@ import { api, type AnchorItem, type UniverseGraph } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RibbonTitle } from "@/components/ui/ribbon";
 import { cn } from "@/lib/utils";
 
 interface Verdict {
@@ -15,7 +16,8 @@ interface Verdict {
   missing: string[];
 }
 
-const PALETTE = ["#68aaa7", "#ee9782", "#8f9fd8", "#e3c567", "#7fb3d5", "#c98fd8", "#7ec8a5"];
+// NookPhone 粉彩色板
+const PALETTE = ["#82d5bb", "#f8a6b2", "#889df0", "#f7cd67", "#e59266", "#b77dee", "#8ac68a"];
 
 export default function UniversePage() {
   const universeVersion = useAppStore((s) => s.universeVersion);
@@ -139,20 +141,19 @@ export default function UniversePage() {
   return (
     <div className="h-full overflow-y-auto">
       <header className="island-header">
-        <div className="island-header-title">
-          <Orbit size={18} className="text-claude-accent" />
-          <h1 className="font-semibold">思维宇宙</h1>
+        <div className="flex items-center gap-3">
+          <RibbonTitle color="green" icon={<Orbit size={14} />}>思维宇宙</RibbonTitle>
           <Badge variant="accent">你的理解 · 3D 知识网络</Badge>
         </div>
-        <div className="flex items-center gap-3 text-xs font-bold text-claude-muted">
+        <div className="flex items-center gap-3 text-xs font-bold text-island-muted">
           <span>{list.length} 个理解节点</span>
-          <span className="text-claude-accent">平均分 {avgScore}</span>
+          <span className="text-island-accentDeep">平均分 {avgScore}</span>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl space-y-4 p-5">
         {pendingInsight && (
-          <div className="flex items-center gap-2 rounded-2xl border border-island-lavender/40 bg-island-lavender/10 px-4 py-3 text-xs font-bold text-island-lavender">
+          <div className="flex items-center gap-2 rounded-[16px] border border-island-lavender/40 bg-island-lavender/10 px-4 py-3 text-xs font-bold text-[#7a3fd0]">
             <Brain size={15} /> 已从对话带入你的原话，补充概念名称后提交评审
           </div>
         )}
@@ -177,15 +178,15 @@ export default function UniversePage() {
               onChange={(e) => setSummary(e.target.value)}
               rows={4}
               placeholder="用自己的话表达你的理解（不用术语堆砌，像讲给别人听）…"
-              className="input resize-none"
+              className="input resize-none rounded-[18px]"
             />
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-claude-muted">AI 将从准确性 / 完整性 / 清晰度 / 原创性四个维度评审，认可后存入思维宇宙</span>
+              <span className="text-[10px] font-bold text-island-muted">AI 将从准确性 / 完整性 / 清晰度 / 原创性四个维度评审，认可后存入思维宇宙</span>
               <button
                 type="button"
                 onClick={() => void submit()}
                 disabled={submitting || !concept.trim() || !summary.trim()}
-                className="inline-flex items-center gap-1.5 rounded-full bg-claude-accent px-4 py-2 text-xs font-bold text-white shadow-soft transition-all hover:-translate-y-0.5 hover:bg-claude-accentHover disabled:opacity-50"
+                className="btn-accent h-9 px-4 text-xs"
               >
                 {submitting ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
                 提交评审
@@ -193,20 +194,20 @@ export default function UniversePage() {
             </div>
 
             {verdict && (
-              <div className={cn("rounded-2xl border px-4 py-3", verdict.approved ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50")}>
+              <div className={cn("rounded-island border-2 px-4 py-3", verdict.approved ? "border-island-success/30 bg-island-success/10" : "border-island-warn/40 bg-island-warn/10")}>
                 <div className="flex items-center gap-2">
                   {verdict.approved ? (
-                    <CheckCircle2 size={18} className="text-green-600" />
+                    <CheckCircle2 size={18} className="text-island-success" />
                   ) : (
-                    <XCircle size={18} className="text-amber-600" />
+                    <XCircle size={18} className="text-[#b8860b]" />
                   )}
-                  <span className={cn("text-sm font-extrabold", verdict.approved ? "text-green-700" : "text-amber-700")}>
+                  <span className={cn("text-sm font-extrabold", verdict.approved ? "text-island-success" : "text-[#8a6010]")}>
                     {verdict.approved ? `认可！已存入思维宇宙（${verdict.score} 分）` : `暂未认可（${verdict.score} 分）`}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-claude-ink">{verdict.feedback}</p>
+                <p className="mt-2 text-sm text-island-inkSoft">{verdict.feedback}</p>
                 {verdict.missing.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-xs text-claude-muted">
+                  <ul className="mt-2 space-y-1 text-xs text-island-muted">
                     {verdict.missing.map((item, i) => (
                       <li key={i}>· {item}</li>
                     ))}
@@ -216,7 +217,7 @@ export default function UniversePage() {
                   <button
                     type="button"
                     onClick={() => setVerdict(null)}
-                    className="mt-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100"
+                    className="mt-2 rounded-full border-2 border-island-warn/50 bg-island-card px-3 py-1 text-xs font-bold text-[#8a6010] transition-colors hover:bg-island-warn/20"
                   >
                     修改后重试
                   </button>
@@ -230,13 +231,13 @@ export default function UniversePage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
-              <Orbit size={16} className="text-claude-accent" />
+              <Orbit size={16} className="text-island-accent" />
               3D 知识网络
-              <span className="text-[10px] font-bold text-claude-muted">拖拽旋转 / 滚轮缩放 / 悬停查看理解</span>
+              <span className="text-[10px] font-bold text-island-muted">拖拽旋转 / 滚轮缩放 / 悬停查看理解</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div ref={graphRef} className="h-[440px] overflow-hidden rounded-2xl border border-claude-border/60 bg-[#f6fbfa]">
+            <div ref={graphRef} className="h-[440px] overflow-hidden rounded-island border border-island-border bg-island-content">
               {dim.w > 20 && graphData.nodes.length > 0 ? (
                 <ForceGraph
                   width={dim.w}
@@ -244,8 +245,8 @@ export default function UniversePage() {
                   graphData={graphData}
                 />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-claude-muted">
-                  <Orbit size={36} className="text-claude-accent/50" />
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-island-muted">
+                  <Orbit size={36} className="text-island-accent/60" />
                   <p className="text-sm font-semibold">思维宇宙还是空的</p>
                   <p className="text-xs">在上方用你自己的话总结一个概念，认可后它会成为第一颗知识星。</p>
                 </div>
@@ -260,7 +261,7 @@ export default function UniversePage() {
             <CardTitle className="flex items-center gap-2 text-sm">
               <Target size={16} className="text-island-coral" />
               知识锚点探测
-              <span className="text-[10px] font-bold text-claude-muted">讲解新概念时，AI 会优先调用这些你已掌握的理解</span>
+              <span className="text-[10px] font-bold text-island-muted">讲解新概念时，AI 会优先调用这些你已掌握的理解</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -276,7 +277,7 @@ export default function UniversePage() {
                 type="button"
                 onClick={() => void probeAnchors()}
                 disabled={anchorLoading || !anchorTopic.trim()}
-                className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-claude-muted shadow-soft transition-colors hover:border-claude-accent/40 hover:text-claude-accent disabled:opacity-50"
+                className="btn-default h-10 shrink-0 px-4 text-xs"
               >
                 {anchorLoading ? <Loader2 size={13} className="animate-spin" /> : "探测"}
               </button>
@@ -284,19 +285,19 @@ export default function UniversePage() {
             {anchors.length > 0 && (
               <div className="space-y-2">
                 {anchors.map((anchor) => (
-                  <div key={anchor.id} className="rounded-2xl border border-claude-accent/20 bg-claude-accentSoft/40 px-3 py-2">
+                  <div key={anchor.id} className="rounded-[16px] border border-island-accent/30 bg-island-accentSoft/50 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Sparkles size={12} className="text-claude-accent" />
-                      <span className="text-sm font-extrabold text-claude-ink">{anchor.concept}</span>
-                      <span className="ml-auto text-[10px] font-bold text-claude-muted">相似度 {(anchor.similarity * 100).toFixed(0)}%</span>
+                      <Sparkles size={12} className="text-island-accentDeep" />
+                      <span className="text-sm font-extrabold text-island-ink">{anchor.concept}</span>
+                      <span className="ml-auto text-[10px] font-bold text-island-muted">相似度 {(anchor.similarity * 100).toFixed(0)}%</span>
                     </div>
-                    <div className="mt-1 line-clamp-2 text-xs text-claude-muted">{anchor.summary}</div>
+                    <div className="mt-1 line-clamp-2 text-xs text-island-muted">{anchor.summary}</div>
                   </div>
                 ))}
               </div>
             )}
             {!anchorLoading && anchorTopic.trim() && anchors.length === 0 && (
-              <p className="text-xs text-claude-muted">暂无关联锚点——先沉淀几个理解，再回来探测吧。</p>
+              <p className="text-xs text-island-muted">暂无关联锚点——先沉淀几个理解，再回来探测吧。</p>
             )}
           </CardContent>
         </Card>
@@ -308,28 +309,28 @@ export default function UniversePage() {
           </CardHeader>
           <CardContent>
             {list.length === 0 ? (
-              <p className="py-4 text-center text-xs text-claude-muted">还没有沉淀的理解</p>
+              <p className="py-4 text-center text-xs text-island-muted">还没有沉淀的理解</p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
                 {list.map((u) => (
-                  <div key={u.id} className="group rounded-2xl border border-claude-border/70 bg-white p-3 transition-shadow hover:shadow-soft">
+                  <div key={u.id} className="group rounded-[16px] border border-island-border bg-island-card p-3 transition-transform duration-200 ease-island hover:-translate-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-extrabold text-claude-ink">{u.concept}</span>
+                      <span className="truncate text-sm font-extrabold text-island-ink">{u.concept}</span>
                       <Badge variant="accent">{u.ai_score} 分</Badge>
                       <button
                         type="button"
                         onClick={() => void removeUnderstanding(u.id, u.concept)}
-                        className="ml-auto shrink-0 rounded-lg p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                        className="ml-auto shrink-0 rounded-lg p-1 text-island-muted opacity-0 transition-opacity hover:bg-island-error/10 hover:text-island-error group-hover:opacity-100"
                         title="删除这条理解"
                       >
                         <Trash2 size={12} />
                       </button>
                     </div>
-                    <p className="mt-1 line-clamp-3 text-xs leading-5 text-claude-muted">{u.summary}</p>
+                    <p className="mt-1 line-clamp-3 text-xs leading-5 text-island-muted">{u.summary}</p>
                     {u.anchors.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {u.anchors.map((a, i) => (
-                          <span key={i} className="rounded-full bg-claude-panel px-2 py-0.5 text-[10px] font-bold text-claude-muted">↔ {a.concept}</span>
+                          <span key={i} className="rounded-full bg-island-panel px-2 py-0.5 text-[10px] font-bold text-island-inkSoft">{a.concept}</span>
                         ))}
                       </div>
                     )}
@@ -359,7 +360,7 @@ function ForceGraph({ width, height, graphData }: { width: number; height: numbe
       linkDirectionalParticles={1}
       linkDirectionalParticleWidth={1.4}
       linkDirectionalParticleSpeed={0.004}
-      linkColor={() => "rgba(104,170,167,0.35)"}
+      linkColor={() => "rgba(25,200,185,0.35)"}
       nodeRelSize={5}
     />
   );

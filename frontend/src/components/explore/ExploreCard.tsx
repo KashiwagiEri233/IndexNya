@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { GripVertical, Loader2, MoveDiagonal, Quote as QuoteIcon, Search, Send, X } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, GripVertical, Loader2, MoveDiagonal, Quote as QuoteIcon, Search, Send, X } from "lucide-react";
 import { Markdown } from "@/components/chat/Markdown";
 import { openExploreCard, resetExploreCard, sendBranchMessage, startExploreCard, switchExploreMode } from "@/lib/explore";
 import type { ChatTerm, ExploreMode } from "@/lib/api";
 import { useAppStore, type ExploreCardState } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
-const MODE_META: Record<ExploreMode, { label: string; short: string; icon: string; badge: string; placeholder: string }> = {
-  child: { label: "子卡片 · 深挖背景", short: "深挖", icon: "↗️", badge: "bg-island-sky/15 text-island-sky", placeholder: "想深挖哪部分？例如：它的前置知识 / 原理细节…（留空则默认讲解）" },
-  related: { label: "关联卡片 · 横向对比", short: "对比", icon: "➡️", badge: "bg-island-coral/15 text-island-coral", placeholder: "想对比哪些方面？例如：它和 XX 有什么区别…（留空则默认发散对比）" },
-  branch: { label: "分支卡片 · 继承上下文", short: "分支", icon: "⬇️", badge: "bg-island-lavender/15 text-island-lavender", placeholder: "想从分支聊什么？留空则默认讲解该名词…" },
+const MODE_META: Record<ExploreMode, { label: string; short: string; icon: typeof ArrowUpRight; badge: string; placeholder: string }> = {
+  child: { label: "子卡片 · 深挖背景", short: "深挖", icon: ArrowUpRight, badge: "bg-island-sky/25 text-[#4358c0]", placeholder: "想深挖哪部分？例如：它的前置知识 / 原理细节…（留空则默认讲解）" },
+  related: { label: "关联卡片 · 横向对比", short: "对比", icon: ArrowRight, badge: "bg-island-orange/25 text-[#a05a28]", placeholder: "想对比哪些方面？例如：它和 XX 有什么区别…（留空则默认发散对比）" },
+  branch: { label: "分支卡片 · 继承上下文", short: "分支", icon: ArrowDown, badge: "bg-island-lavender/25 text-[#7a3fd0]", placeholder: "想从分支聊什么？留空则默认讲解该名词…" },
 };
 
 const MODE_ORDER: ExploreMode[] = ["child", "related", "branch"];
@@ -225,7 +225,7 @@ export function ExploreCard({
             <div
               className={cn(
                 "max-w-[92%] rounded-2xl px-3 py-2 text-sm shadow-soft",
-                message.role === "user" ? "rounded-br-md bg-claude-user" : "rounded-bl-md border bg-white"
+                message.role === "user" ? "rounded-br-md bg-island-user" : "rounded-bl-md border border-island-border bg-island-card"
               )}
             >
               {message.role === "assistant" ? (
@@ -236,12 +236,12 @@ export function ExploreCard({
                     </Markdown>
                   </div>
                 ) : (
-                  <span className="text-claude-muted">…</span>
+                  <span className="text-island-muted">…</span>
                 )
               ) : (
                 <div className="whitespace-pre-wrap">{message.content}</div>
               )}
-              {message.streaming && <span className="ml-1 inline-block h-4 w-1 animate-pulse align-middle bg-claude-accent" />}
+              {message.streaming && <span className="ml-1 inline-block h-4 w-1 animate-pulse align-middle bg-island-accent" />}
             </div>
           </div>
         ))}
@@ -259,8 +259,8 @@ export function ExploreCard({
         zIndex: focused ? 300 : 40 + depth,
       }}
       className={cn(
-        "fixed flex flex-col overflow-hidden rounded-[1.5rem] border border-white bg-[#f8fcfb] shadow-island",
-        focused && "border-claude-accent ring-4 ring-claude-accent/30",
+        "fixed flex flex-col overflow-hidden rounded-[1.5rem] border border-island-border bg-island-content shadow-island",
+        focused && "border-island-accent ring-4 ring-island-accent/30",
         card.closing ? "explore-card-out" : "explore-card-in"
       )}
     >
@@ -276,7 +276,7 @@ export function ExploreCard({
         />
       ))}
       {/* 右下角可见缩放把手（装饰） */}
-      <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex h-6 w-6 items-end justify-end rounded-bl-xl p-0.5 text-claude-muted/50 select-none">
+      <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex h-6 w-6 items-end justify-end rounded-bl-xl p-0.5 text-island-muted/50 select-none">
         <MoveDiagonal size={13} />
       </div>
 
@@ -285,22 +285,22 @@ export function ExploreCard({
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className="flex cursor-move select-none items-center justify-between border-b border-claude-border/70 bg-white/90 px-4 py-3 backdrop-blur"
+        className="flex cursor-move select-none items-center justify-between border-b border-island-border bg-island-card/90 px-4 py-3 backdrop-blur"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <GripVertical size={15} className="shrink-0 text-claude-muted/70" />
-          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl", meta.badge)}>
-            <span className="text-sm leading-none">{meta.icon}</span>
+          <GripVertical size={15} className="shrink-0 text-island-muted/70" />
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px]", meta.badge)}>
+            <meta.icon size={15} strokeWidth={2.6} />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-extrabold text-claude-ink">{card.term}</div>
-            <div className="truncate text-[10px] text-claude-muted">{meta.label}</div>
+            <div className="truncate text-sm font-extrabold text-island-ink">{card.term}</div>
+            <div className="truncate text-[10px] text-island-muted">{meta.label}</div>
           </div>
         </div>
         <button
           type="button"
           onClick={() => exploreClose(card.key)}
-          className="rounded-full p-1.5 text-claude-muted hover:bg-claude-panel hover:text-claude-ink"
+          className="rounded-full p-1.5 text-island-muted hover:bg-island-panel hover:text-island-ink"
           title="关闭卡片"
         >
           <X size={16} />
@@ -308,15 +308,15 @@ export function ExploreCard({
       </header>
 
       {breadcrumb.length > 0 && (
-        <div className="flex items-center gap-1 overflow-x-auto border-b border-claude-border/50 bg-white/50 px-4 py-1.5 text-[10px] font-bold text-claude-muted">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-island-border bg-island-card/60 px-4 py-1.5 text-[10px] font-bold text-island-muted">
           {breadcrumb.map((item, index) => (
             <span key={index} className="flex shrink-0 items-center gap-1">
-              {index > 0 && <span className="text-claude-border">›</span>}
+              {index > 0 && <span className="text-island-border">›</span>}
               <span className="max-w-[9rem] truncate">{item}</span>
             </span>
           ))}
-          <span className="shrink-0 text-claude-border">›</span>
-          <span className="max-w-[9rem] shrink-0 truncate text-claude-accent">{card.term}</span>
+          <span className="shrink-0 text-island-border">›</span>
+          <span className="max-w-[9rem] shrink-0 truncate text-island-accent">{card.term}</span>
         </div>
       )}
 
@@ -328,7 +328,7 @@ export function ExploreCard({
         className={cn("min-h-0 flex-1 overflow-y-auto px-3 py-3", isPending && "flex flex-col")}
       >
         {card.explanation && (
-          <div className={cn("rounded-2xl border border-claude-accent/20 bg-claude-accentSoft/55 px-3 py-2.5 text-xs leading-5 text-claude-ink", !isPending && "mb-3")}>
+          <div className={cn("rounded-2xl border border-island-accent/20 bg-island-accentSoft/55 px-3 py-2.5 text-xs leading-5 text-island-ink", !isPending && "mb-3")}>
             <div className="mb-1 font-extrabold">{card.term}</div>
             <div>{card.explanation}</div>
           </div>
@@ -338,7 +338,7 @@ export function ExploreCard({
           <>
             {card.messages.length > 0 && (
               <div className="mb-3">
-                <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-claude-panel/60 px-2 py-1 text-[10px] font-bold text-claude-muted">
+                <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-island-panel/60 px-2 py-1 text-[10px] font-bold text-island-muted">
                   <span className="h-1.5 w-1.5 rounded-full bg-island-lavender" />
                   切换前的回答（发送新问题后将重新生成）
                 </div>
@@ -346,26 +346,26 @@ export function ExploreCard({
               </div>
             )}
             <div className="mt-4 flex flex-col items-center gap-2 px-2 text-center">
-              <p className="text-sm font-bold text-claude-ink">想怎么了解「{card.term}」？</p>
-              <p className="text-xs text-claude-muted">补充你想问的问题（或直接发送默认讲解），也可以选中回答文本追问或引用</p>
+              <p className="text-sm font-bold text-island-ink">想怎么了解「{card.term}」？</p>
+              <p className="text-xs text-island-muted">补充你想问的问题（或直接发送默认讲解），也可以选中回答文本追问或引用</p>
             </div>
           </>
         ) : (
           <>
             {card.status === "opening" && card.messages.length > 0 && (
-              <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-claude-accentSoft/60 px-2 py-1 text-[10px] font-bold text-claude-accent">
+              <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-island-accentSoft/60 px-2 py-1 text-[10px] font-bold text-island-accent">
                 <Loader2 size={11} className="animate-spin" /> 正在重新生成，新回答将替换下方内容…
               </div>
             )}
             {card.messages.length === 0 && card.status === "opening" && (
-              <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs font-bold text-claude-muted">
-                <Loader2 size={14} className="animate-spin text-claude-accent" />
+              <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs font-bold text-island-muted">
+                <Loader2 size={14} className="animate-spin text-island-accent" />
                 {card.mode === "branch" ? "正在创建分支对话…" : "正在生成探索卡片…"}
               </div>
             )}
             {renderMessages(card.messages)}
             {card.status === "error" && card.error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-500">{card.error}</div>
+              <div className="rounded-[14px] border-2 border-island-error/30 bg-island-error/10 px-3 py-2 text-xs font-semibold text-island-error">{card.error}</div>
             )}
           </>
         )}
@@ -376,7 +376,7 @@ export function ExploreCard({
         createPortal(
           <div
             style={{ left: quoteBtn.x - 84, top: quoteBtn.y }}
-            className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-white bg-white/95 p-1 shadow-island backdrop-blur"
+            className="fixed z-[80] flex items-center gap-0.5 rounded-full border border-island-border bg-island-card/95 p-1 shadow-island backdrop-blur"
           >
             <button
               type="button"
@@ -386,7 +386,7 @@ export function ExploreCard({
                 setQuoteBtn(null);
                 window.getSelection()?.removeAllRanges();
               }}
-              className="flex items-center gap-1 rounded-full bg-claude-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-claude-accentHover"
+              className="flex items-center gap-1 rounded-full bg-island-accent px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-island-accentHover"
               title="以选中内容为名词打开追问卡片"
             >
               <Search size={12} /> 追问
@@ -398,7 +398,7 @@ export function ExploreCard({
                 setQuoteBtn(null);
                 window.getSelection()?.removeAllRanges();
               }}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-claude-muted transition-colors hover:bg-claude-panel hover:text-claude-ink"
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-island-muted transition-colors hover:bg-island-panel hover:text-island-ink"
               title="把选中内容作为引用，随下一条提问发送"
             >
               <QuoteIcon size={12} /> 引用
@@ -408,7 +408,7 @@ export function ExploreCard({
         )}
 
       {/* 底部：模式切换 + 输入区 */}
-      <div className="border-t border-claude-border/70 bg-white/75 p-3">
+      <div className="border-t border-island-border bg-island-card/75 p-3">
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {MODE_ORDER.map((mode) => {
             const m = MODE_META[mode];
@@ -421,16 +421,16 @@ export function ExploreCard({
                 onClick={() => switchExploreMode(card.key, mode)}
                 title={`切换为${m.label}`}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold transition-colors disabled:opacity-50",
-                  active ? "border-claude-accent bg-claude-accent text-white" : "border-claude-border/70 bg-white text-claude-muted hover:border-claude-accent/40 hover:text-claude-accent"
+                  "inline-flex items-center gap-1 rounded-full border-2 px-2.5 py-1 text-[11px] font-bold transition-all duration-200 ease-island disabled:opacity-50",
+                  active ? "border-island-accent bg-island-accent text-white" : "border-island-border bg-island-card text-island-muted hover:-translate-y-px hover:border-island-accent/60 hover:text-island-accentDeep"
                 )}
               >
-                <span>{m.icon}</span>
+                <m.icon size={12} strokeWidth={2.6} />
                 {m.short}
               </button>
             );
           })}
-          <span className="ml-auto text-[10px] font-bold text-claude-muted">
+          <span className="ml-auto text-[10px] font-bold text-island-muted">
             {card.status === "streaming" ? "生成中…" : isPending ? "补充问题后发送" : "点术语或选中文本可继续下钻"}
           </span>
         </div>
@@ -439,17 +439,17 @@ export function ExploreCard({
           <button
             type="button"
             onClick={() => { setInput(""); setQuote(null); resetExploreCard(card.key); }}
-            className="w-full rounded-2xl border border-claude-accent/40 bg-claude-accentSoft py-2 text-xs font-bold text-claude-accent transition-colors hover:bg-claude-accent hover:text-white"
+            className="w-full rounded-[16px] border-2 border-island-accent/40 bg-island-accentSoft py-2 text-xs font-bold text-island-accentDeep transition-colors hover:bg-island-accent hover:text-white"
           >
             重新生成（可修改问题）
           </button>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-white bg-white shadow-soft focus-within:ring-4 focus-within:ring-claude-accent/15">
+          <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card shadow-soft transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
             {quote && (
-              <div className="flex items-start gap-2 border-b border-claude-border/60 bg-claude-accentSoft/50 px-2.5 py-1.5 text-xs text-claude-ink">
-                <QuoteIcon size={12} className="mt-0.5 shrink-0 text-claude-accent" />
-                <div className="min-w-0 flex-1 line-clamp-2 whitespace-pre-wrap text-claude-muted">{quote}</div>
-                <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-0.5 text-claude-muted hover:bg-white hover:text-claude-ink" title="移除引用"><X size={12} /></button>
+              <div className="flex items-start gap-2 border-b border-island-border bg-island-accentSoft/60 px-2.5 py-1.5 text-xs text-island-ink">
+                <QuoteIcon size={12} className="mt-0.5 shrink-0 text-island-accentDeep" />
+                <div className="min-w-0 flex-1 line-clamp-2 whitespace-pre-wrap text-island-muted">{quote}</div>
+                <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-0.5 text-island-muted hover:bg-island-card hover:text-island-ink" title="移除引用"><X size={12} /></button>
               </div>
             )}
             <textarea
@@ -475,15 +475,15 @@ export function ExploreCard({
               }
               className="w-full resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-sm outline-none"
             />
-            <div className="flex items-center justify-between border-t border-claude-border/60 px-2 py-1.5">
-              <span className="max-w-[240px] truncate text-[10px] font-bold text-claude-muted">
+            <div className="flex items-center justify-between border-t border-island-border px-2 py-1.5">
+              <span className="max-w-[240px] truncate text-[10px] font-bold text-island-muted">
                 {card.mode === "branch" && !isPending ? "独立分支对话" : "Enter 发送 · Shift+Enter 换行"}
               </span>
               <button
                 type="button"
                 onClick={() => void send()}
                 disabled={card.status === "streaming" || (!input.trim() && !quote)}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-claude-accent text-white disabled:opacity-40"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-island-accent text-white shadow-btn-3d-teal transition-all duration-200 ease-island hover:-translate-y-px hover:bg-island-accentHover hover:shadow-btn-3d-teal-hover active:translate-y-[2px] active:shadow-btn-3d-teal-active disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
                 title="发送"
               >
                 {card.status === "streaming" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}

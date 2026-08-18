@@ -1,15 +1,12 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** animal-island-ui 卡片：20px 圆角、无 box-shadow，仅 hover 上浮 2px。 */
 export const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("rounded-island border bg-white shadow-soft transition-shadow duration-200 hover:shadow-island", className)}
-    {...props}
-  />
+  <div ref={ref} className={cn("card", className)} {...props} />
 ));
 Card.displayName = "Card";
 
@@ -19,7 +16,7 @@ export const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col gap-1 border-b border-claude-border/70 p-5", className)}
+    className={cn("flex flex-col gap-1 border-b border-island-border/80 p-5", className)}
     {...props}
   />
 ));
@@ -31,7 +28,7 @@ export const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn("text-base font-extrabold leading-none tracking-tight", className)}
+    className={cn("text-base font-extrabold leading-none text-island-ink", className)}
     {...props}
   />
 ));

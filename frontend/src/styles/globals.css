@@ -1,8 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+ * animal-island-ui 设计规范落地
+ * 真源：animal-island-ui-main/docs/design-system/design-rules.md
+ * ============================================================ */
 
 @layer base {
   :root {
@@ -14,89 +19,201 @@
     height: 100%;
   }
   body {
-    @apply bg-claude-bg text-claude-ink font-sans antialiased;
+    @apply bg-island-bg text-island-ink font-sans antialiased;
+    font-weight: 500;
     background-image:
-      radial-gradient(circle at 92% 4%, rgba(178, 223, 219, .26), transparent 23rem),
-      radial-gradient(circle at 6% 94%, rgba(250, 227, 217, .30), transparent 22rem);
+      radial-gradient(circle at 90% 5%, rgba(25, 200, 185, .10), transparent 24rem),
+      radial-gradient(circle at 5% 93%, rgba(247, 205, 103, .18), transparent 22rem);
   }
   * {
-    @apply border-claude-border;
+    @apply border-island-border;
   }
   button,
   input,
   textarea {
     font: inherit;
   }
+  /* 焦点：按钮用薄荷青绿，绝不用蓝 */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid #19c8b9;
+    outline-offset: 2px;
+  }
+  /* 输入类控件用暖黄焦点 */
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #ffcc00;
+    outline-offset: 1px;
+  }
+  ::selection {
+    background: rgba(245, 195, 28, .35);
+  }
 }
 
 @layer components {
+  /* ---------- 按钮 ----------
+   * 规范：pill 形（50px）；3D 像素堆叠阴影仅用于 primary 级；
+   * default / ghost 只用柔和高程阴影。 */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 text-sm font-bold tracking-[0.02em] transition-all duration-200 ease-island disabled:pointer-events-none disabled:opacity-50;
   }
+  /* primary：奶油底 + 暖灰褐 3D 底影，hover 上浮 / active 下压 */
   .btn-primary {
-    @apply btn bg-claude-accent text-white shadow-soft hover:-translate-y-0.5 hover:bg-claude-accentHover hover:shadow-island;
+    @apply btn bg-island-bg text-island-ink shadow-btn-3d hover:-translate-y-px hover:shadow-btn-3d-hover active:translate-y-[2px] active:shadow-btn-3d-active;
+  }
+  /* accent：薄荷青绿主行动按钮（同属 primary 级，允许 3D 底影） */
+  .btn-accent {
+    @apply btn bg-island-accent text-white shadow-btn-3d-teal hover:-translate-y-px hover:bg-island-accentHover hover:shadow-btn-3d-teal-hover active:translate-y-[2px] active:bg-island-accentActive active:shadow-btn-3d-teal-active;
+  }
+  .btn-default {
+    @apply btn border-2 border-island-borderStrong/50 bg-island-bg text-island-ink shadow-soft hover:-translate-y-px hover:border-island-accent hover:text-island-accent hover:shadow-island;
   }
   .btn-ghost {
-    @apply btn text-claude-ink hover:bg-white hover:text-claude-accent hover:shadow-soft;
+    @apply btn text-island-inkSoft hover:bg-island-panel;
   }
+
+  /* ---------- 卡片：20px 圆角、无投影，仅 hover 浮起 ---------- */
   .card {
-    @apply rounded-island border bg-white shadow-soft;
+    @apply rounded-island border border-island-border bg-island-card transition-transform duration-200 ease-island hover:-translate-y-0.5;
   }
+
+  /* ---------- 输入框：pill、默认无阴影、暖黄焦点 ---------- */
   .input {
-    @apply w-full rounded-xl border bg-white px-4 py-2.5 text-sm outline-none transition-shadow focus:ring-4 focus:ring-claude-accent/20;
+    @apply w-full rounded-full border-2 border-island-borderStrong/50 bg-white px-4 py-2.5 text-sm font-medium text-island-ink transition-all duration-200 ease-island placeholder:font-normal placeholder:text-island-muted/70 hover:border-island-borderStrong focus:border-island-accent;
   }
+
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full bg-claude-accentSoft px-3 py-1 text-xs font-bold text-claude-accent;
+    @apply inline-flex items-center gap-1 rounded-full bg-island-accentSoft px-3 py-1 text-xs font-bold text-island-accentDeep;
   }
+
+  /* ---------- 页头 ---------- */
   .island-header {
-    @apply min-h-[4.25rem] border-b border-claude-border/80 px-6 flex items-center justify-between sticky top-0 bg-claude-bg/95 backdrop-blur-md z-10;
+    @apply sticky top-0 z-10 flex min-h-[4.25rem] items-center justify-between border-b border-island-border/90 bg-island-bg/90 px-6 backdrop-blur-md;
   }
   .island-header-title {
-    @apply inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 shadow-soft;
+    @apply inline-flex items-center gap-2 rounded-full border border-island-border/80 bg-island-card px-3.5 py-2 shadow-soft;
   }
   .island-header-title h1 {
-    @apply text-[15px] font-extrabold tracking-tight;
+    @apply text-[15px] font-extrabold text-island-ink;
   }
   .island-surface {
-    @apply rounded-island border border-white/80 bg-white/85 shadow-soft backdrop-blur-sm;
+    @apply rounded-island border border-island-border bg-island-card/90;
   }
   .island-dot-pattern {
-    background-image: radial-gradient(rgba(104, 170, 167, .22) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(25, 200, 185, .18) 1px, transparent 1px);
     background-size: 16px 16px;
+  }
+
+  /* ---------- Title 燕尾飘带（还原组件库 Title） ---------- */
+  .ribbon {
+    --rf: #19c8b9;
+    --rb: #14a094;
+    --rk: #0b6b64;
+    --rt: #ffffff;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2em;
+    padding: 0 1.6em;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+    filter: drop-shadow(0 0.08em 0.12em rgba(61, 52, 40, 0.12));
+  }
+  .ribbon-text {
+    position: relative;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    height: 2em;
+    padding-top: 0.11em; /* CJK 视觉重心微调 */
+    color: var(--rt);
+    text-shadow: 0 0.04em 0.08em rgba(61, 52, 40, 0.12);
+  }
+  .ribbon-back {
+    position: absolute;
+    bottom: -0.38em;
+    width: 1.7em;
+    height: 1.7em;
+    background: var(--rb);
+    z-index: 1;
+  }
+  .ribbon-back-left {
+    left: -0.6em;
+    border-radius: 0.08em 0 0 0.08em;
+    clip-path: polygon(100% 0%, 100% 100%, 0% 100%, 30% 50%, 0% 0%);
+  }
+  .ribbon-back-right {
+    right: -0.6em;
+    border-radius: 0 0.08em 0.08em 0;
+    clip-path: polygon(0% 0%, 100% 0%, 70% 50%, 100% 100%, 0% 100%);
+  }
+  .ribbon-fold {
+    position: absolute;
+    top: calc(100% - 0.05em);
+    width: 0;
+    height: 0;
+    border-style: solid;
+    z-index: 2;
+  }
+  .ribbon-fold-left {
+    left: 0.15em;
+    border-width: 0 0.95em 0.45em 0;
+    border-color: transparent var(--rk) transparent transparent;
+  }
+  .ribbon-fold-right {
+    right: 0.16em;
+    border-width: 0 0 0.45em 0.95em;
+    border-color: transparent transparent transparent var(--rk);
+  }
+  .ribbon-front {
+    position: absolute;
+    inset: 0 0.1em;
+    background: var(--rf);
+    border-radius: 0.2em;
+    z-index: 3;
+    transform: perspective(11.5em) rotateX(3deg);
+    box-shadow: inset 0 -0.06em 0 rgba(61, 52, 40, 0.08);
+    pointer-events: none;
   }
 }
 
-/* Markdown rendering */
-.prose-claude {
-  @apply text-[15px] leading-7 text-claude-ink;
+/* ---------- Markdown 正文 ---------- */
+.prose-island {
+  @apply text-[15px] font-medium leading-7 text-island-inkSoft;
 }
-.prose-claude h1,
-.prose-claude h2,
-.prose-claude h3 {
-  @apply font-extrabold mt-5 mb-2;
+.prose-island h1,
+.prose-island h2,
+.prose-island h3 {
+  @apply mb-2 mt-5 font-extrabold text-island-ink;
 }
-.prose-claude h1 { @apply text-xl; }
-.prose-claude h2 { @apply text-lg; }
-.prose-claude h3 { @apply text-base; }
-.prose-claude p { @apply my-2; }
-.prose-claude ul { @apply list-disc pl-6 my-2; }
-.prose-claude ol { @apply list-decimal pl-6 my-2; }
-.prose-claude li { @apply my-1; }
-.prose-claude code { @apply rounded-lg bg-claude-accentSoft px-1.5 py-0.5 text-[13px] font-mono text-claude-ink; }
-.prose-claude pre { @apply rounded-island bg-[#2f4144] text-[#f8fffd] p-4 my-3 overflow-x-auto text-[13px] shadow-soft; }
-.prose-claude pre code { @apply bg-transparent p-0 text-inherit; }
-.prose-claude blockquote { @apply border-l-4 border-island-coral pl-3 italic text-claude-muted my-2; }
-.prose-claude table { @apply w-full border-collapse my-3 text-sm; }
-.prose-claude th,
-.prose-claude td { @apply border px-2 py-1 text-left; }
-.prose-claude a { @apply font-bold text-claude-accent underline decoration-claude-accent/40 underline-offset-2; }
+.prose-island h1 { @apply text-xl; }
+.prose-island h2 { @apply text-lg; }
+.prose-island h3 { @apply text-base; }
+.prose-island p { @apply my-2; }
+.prose-island ul { @apply my-2 list-disc pl-6; }
+.prose-island ol { @apply my-2 list-decimal pl-6; }
+.prose-island li { @apply my-1; }
+.prose-island code { @apply rounded-lg bg-island-accentSoft px-1.5 py-0.5 font-mono text-[13px] text-island-accentDeep; }
+.prose-island pre { @apply my-3 overflow-x-auto rounded-island bg-[#463729] p-4 text-[13px] text-[#f8f1de] shadow-soft; }
+.prose-island pre code { @apply bg-transparent p-0 text-inherit; }
+.prose-island blockquote { @apply my-2 border-l-4 border-island-orange pl-3 italic text-island-muted; }
+.prose-island table { @apply my-3 w-full border-collapse text-sm; }
+.prose-island th,
+.prose-island td { @apply border px-2 py-1 text-left; }
+.prose-island a { @apply font-bold text-island-accentDeep underline decoration-island-accent/40 underline-offset-2; }
 
-/* Scrollbars */
+/* ---------- 滚动条 ---------- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: rgba(104, 170, 167, .28); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(104, 170, 167, .48); }
+::-webkit-scrollbar-thumb { background: rgba(170, 166, 157, .5); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(170, 166, 157, .8); }
 
-/* 探索卡片滑入 / 滑出动画（层级对话） */
+/* ---------- 探索卡片滑入 / 滑出动画（层级对话） ---------- */
 @keyframes explore-card-in {
   from { opacity: 0; transform: translateX(32px) scale(0.97); }
   to { opacity: 1; transform: translateX(0) scale(1); }
@@ -105,5 +222,5 @@
   from { opacity: 1; transform: translateX(0) scale(1); }
   to { opacity: 0; transform: translateX(32px) scale(0.97); }
 }
-.explore-card-in { animation: explore-card-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.explore-card-out { animation: explore-card-out 0.2s ease-in both; }
+.explore-card-in { animation: explore-card-in 0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.explore-card-out { animation: explore-card-out 0.2s cubic-bezier(0.4, 0, 0.2, 1) both; }

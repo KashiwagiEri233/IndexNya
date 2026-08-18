@@ -8,10 +8,11 @@ import { openExploreCard, restoreExploreCard } from "@/lib/explore";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 const NAV = [
-  { to: "/chat", label: "学习对话", icon: Sparkles, tone: "text-island-coral" },
-  { to: "/practice", label: "错题本", icon: ClipboardCheck, tone: "text-island-lavender" },
-  { to: "/literature", label: "文献阅读", icon: ScrollText, tone: "text-island-butter" },
-  { to: "/universe", label: "思维宇宙", icon: Orbit, tone: "text-island-lavender" },
+  // NookPhone 粉彩应用砖配色
+  { to: "/chat", label: "学习对话", icon: Sparkles, tile: "bg-island-seafoam/35 text-[#2f8a70]" },
+  { to: "/practice", label: "错题本", icon: ClipboardCheck, tile: "bg-island-yellow/45 text-[#8a6010]" },
+  { to: "/literature", label: "文献阅读", icon: ScrollText, tile: "bg-island-sky/30 text-[#4358c0]" },
+  { to: "/universe", label: "思维宇宙", icon: Orbit, tile: "bg-island-lavender/30 text-[#7a3fd0]" },
 ];
 
 const CARD_TYPE_META: Record<string, { icon: any; label: string; color: string }> = {
@@ -64,14 +65,14 @@ function CardTree({
         const meta = CARD_TYPE_META[card.type] ?? CARD_TYPE_META.child;
         const Icon = meta.icon;
         return (
-          <div key={card.id} className="group relative flex items-center rounded-xl transition-colors">
-            <span className="pointer-events-none absolute -left-2 top-0 h-1/2 w-2 border-l border-b border-claude-border/80" />
+          <div key={card.id} className="group relative flex items-center rounded-[12px] transition-colors">
+            <span className="pointer-events-none absolute -left-2 top-0 h-1/2 w-2 border-l border-b border-island-borderStrong/50" />
             <button
               onClick={() => onReopen(card)}
-              className="flex min-w-0 flex-1 items-center gap-1 py-1.5 pl-1 text-left text-[11px] font-bold text-claude-muted transition-colors hover:bg-white/75 hover:text-claude-ink"
+              className="flex min-w-0 flex-1 items-center gap-1 py-1.5 pl-1 text-left text-[11px] font-bold text-island-muted transition-colors hover:bg-island-card/75 hover:text-island-ink"
               title={`重开探索卡片「${card.term}」（${meta.label}）`}
             >
-              <span className="shrink-0 whitespace-pre font-mono text-[10px] leading-4 text-claude-border">
+              <span className="shrink-0 whitespace-pre font-mono text-[10px] leading-4 text-island-borderStrong/70">
                 {prefix}
                 {isLast ? "└─ " : "├─ "}
               </span>
@@ -81,7 +82,7 @@ function CardTree({
             <button
               type="button"
               onClick={() => onDelete(card)}
-              className="mr-0.5 shrink-0 rounded-md p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+              className="mr-0.5 shrink-0 rounded-md p-1 text-island-muted opacity-0 transition-opacity hover:bg-island-error/10 hover:text-island-error group-hover:opacity-100"
               title="删除探索卡片及其后代"
             >
               <Trash2 size={10} />
@@ -213,44 +214,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-claude-bg">
-      <aside className="relative flex w-[17rem] shrink-0 flex-col overflow-hidden border-r border-claude-border/80 bg-[#f3faf8]">
-        <div className="pointer-events-none absolute -right-14 -top-12 h-40 w-40 rounded-full bg-island-mint/45 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-island-peach/55 blur-2xl" />
-
+    <div className="flex h-screen w-screen overflow-hidden bg-island-bg">
+      <aside className="relative flex w-[17rem] shrink-0 flex-col overflow-hidden border-r border-island-border bg-island-panel/60">
         <div className="relative px-5 pb-5 pt-6">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] bg-claude-accent text-white shadow-island">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-island-accent text-white shadow-btn-3d-teal">
               <BookOpen size={21} strokeWidth={2.4} />
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-island-coral text-white">
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-island-pink text-white">
                 <Flower2 size={10} />
               </span>
             </div>
             <div className="leading-tight">
-              <div className="text-[15px] font-extrabold tracking-tight text-claude-ink">Index 学习岛</div>
-              <div className="mt-1 text-[11px] font-bold text-claude-muted">记录、整理、持续进步</div>
+              <div className="text-[15px] font-extrabold text-island-ink">Index 学习岛</div>
+              <div className="mt-1 text-[11px] font-bold text-island-muted">记录、整理、持续进步</div>
             </div>
           </div>
         </div>
 
         <nav className="relative space-y-1 px-3 pb-4">
-          <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-claude-muted/70">Explore</div>
-          {NAV.map(({ to, label, icon: Icon, tone }) => (
+          <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-island-muted">Explore</div>
+          {NAV.map(({ to, label, icon: Icon, tile }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 cn(
-                  "group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-200",
+                  "group flex items-center gap-3 rounded-[16px] px-3.5 py-3 text-sm font-bold transition-all duration-200 ease-island",
                   isActive
-                    ? "bg-white text-claude-ink shadow-soft"
-                    : "text-claude-muted hover:bg-white/75 hover:text-claude-ink"
+                    ? "bg-island-card text-island-ink shadow-soft"
+                    : "text-island-inkSoft/80 hover:bg-island-card/70 hover:text-island-ink"
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className={cn("flex h-8 w-8 items-center justify-center rounded-xl bg-white/70 transition-colors", isActive && "bg-claude-accentSoft", tone)}>
+                  <span className={cn("flex h-8 w-8 items-center justify-center rounded-[12px] transition-transform duration-200 ease-island group-hover:-translate-y-px", tile)}>
                     <Icon size={16} strokeWidth={2.4} />
                   </span>
                   <span className="flex-1">{label}</span>
@@ -261,12 +259,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="relative flex min-h-0 flex-1 flex-col border-t border-claude-border/70 px-3 pt-4">
+        <div className="relative flex min-h-0 flex-1 flex-col border-t border-island-border px-3 pt-4">
           <div className="flex items-center justify-between px-3 pb-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-claude-muted/70">Recent chats</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-island-muted">Recent chats</span>
             <button
               onClick={newConversation}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-claude-muted shadow-soft transition-colors hover:text-claude-accent"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-island-card text-island-muted shadow-soft transition-all duration-200 ease-island hover:-translate-y-px hover:text-island-accentDeep"
               title="新建对话"
             >
               <Plus size={15} />
@@ -274,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex-1 space-y-1 overflow-y-auto pb-3">
             {(conversations ?? []).length === 0 && (
-              <div className="rounded-2xl border border-dashed border-claude-border bg-white/45 px-3 py-5 text-center text-xs font-semibold text-claude-muted">
+              <div className="rounded-[16px] border-2 border-dashed border-island-borderStrong/40 bg-island-card/50 px-3 py-5 text-center text-xs font-semibold text-island-muted">
                 还没有对话，去岛上探索吧
               </div>
             )}
@@ -284,11 +282,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div key={c.id}>
                   <div
                     style={depth > 0 ? { marginLeft: `${depth * 16}px`, width: `calc(100% - ${depth * 16}px)` } : undefined}
-                    className="group relative flex items-center rounded-2xl transition-colors"
+                    className="group relative flex items-center rounded-[16px] transition-colors"
                   >
                     {depth > 0 && (
                       <>
-                        <span className="pointer-events-none absolute -left-3 top-0 h-1/2 w-3 border-l border-b border-claude-border/90" />
+                        <span className="pointer-events-none absolute -left-3 top-0 h-1/2 w-3 border-l border-b border-island-borderStrong/50" />
                         <span className="pointer-events-none absolute -left-3 top-1/2 text-[10px] font-bold leading-none text-island-lavender">└─</span>
                       </>
                     )}
@@ -298,21 +296,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         "flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left text-sm font-semibold transition-colors",
                         depth > 0 ? "pl-1" : "px-3",
                         convId === c.id
-                          ? "bg-white text-claude-ink shadow-soft"
-                          : "text-claude-muted hover:bg-white/75 hover:text-claude-ink"
+                          ? "bg-island-card text-island-ink shadow-soft"
+                          : "text-island-inkSoft/80 hover:bg-island-card/70 hover:text-island-ink"
                       )}
                     >
                       {depth > 0 ? (
                         <GitBranch size={13} className="shrink-0 text-island-lavender" />
                       ) : (
-                        <MessageSquare size={14} className="shrink-0 text-claude-accent" />
+                        <MessageSquare size={14} className="shrink-0 text-island-accentDeep" />
                       )}
                       <span className="truncate">{c.title}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteConversation(c.id, c.title)}
-                      className="mr-1 shrink-0 rounded-lg p-1.5 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus:opacity-100"
+                      className="mr-1 shrink-0 rounded-lg p-1.5 text-island-muted opacity-0 transition-opacity hover:bg-island-error/10 hover:text-island-error group-hover:opacity-100 focus:opacity-100"
                       title={depth > 0 ? "删除子对话" : "删除对话及其子对话"}
                     >
                       <Trash2 size={13} />
@@ -330,7 +328,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* 无对话归属的卡片（文献探索） */}
             {(cardsByConversation.get(null) ?? []).length > 0 && (
               <div className="pt-2">
-                <div className="flex items-center gap-1.5 px-3 pb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-claude-muted/70">
+                <div className="flex items-center gap-1.5 px-3 pb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-island-muted">
                   <Layers size={11} /> 文献探索
                 </div>
                 <div className="space-y-0.5">
@@ -341,14 +339,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="relative m-3 rounded-2xl border border-white bg-white/75 p-3 shadow-soft">
-          <button type="button" onClick={() => setSettingsOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
+        <div className="relative m-3 rounded-island border border-island-border bg-island-card p-3">
+          <button type="button" onClick={() => setSettingsOpen(true)} className="btn-default h-9 w-full text-xs" title="打开设置">
             <Settings size={13} /> 设置
           </button>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-hidden bg-claude-bg">{children}</main>
+      <main className="min-w-0 flex-1 overflow-hidden bg-island-bg">{children}</main>
       <SettingsDialog />
     </div>
   );

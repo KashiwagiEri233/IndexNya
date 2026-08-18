@@ -7,6 +7,7 @@ import { Markdown } from "@/components/chat/Markdown";
 import { ExploreDock } from "@/components/explore/ExploreDock";
 import { openExploreCard, resolveModel } from "@/lib/explore";
 import { Badge } from "@/components/ui/badge";
+import { RibbonTitle } from "@/components/ui/ribbon";
 import { cn } from "@/lib/utils";
 
 const TYPE_LABEL: Record<string, string> = { pdf: "PDF", txt: "TXT", md: "Markdown" };
@@ -107,16 +108,15 @@ export default function LiteraturePage() {
   return (
     <div className="flex h-full flex-col">
       <header className="island-header">
-        <div className="island-header-title">
-          <ScrollText size={18} className="text-claude-accent" />
-          <h1 className="font-semibold">文献阅读</h1>
+        <div className="flex items-center gap-3">
+          <RibbonTitle color="blue" icon={<ScrollText size={14} />}>文献阅读</RibbonTitle>
           <Badge variant="accent">哪里不懂点哪里</Badge>
         </div>
         <button
           type="button"
           disabled={uploading}
           onClick={() => fileRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-2 text-xs font-bold text-claude-muted shadow-soft transition-colors hover:border-claude-accent/40 hover:text-claude-accent disabled:opacity-50"
+          className="btn-accent h-9 px-4 text-xs"
         >
           <UploadCloud size={14} /> {uploading ? "上传中…" : "导入文献"}
         </button>
@@ -134,25 +134,25 @@ export default function LiteraturePage() {
 
       <div className="flex min-h-0 flex-1">
         {/* 文献列表 */}
-        <aside className="flex w-[15rem] shrink-0 flex-col overflow-y-auto border-r border-claude-border/70 bg-[#f8fcfb]/70 p-3">
+        <aside className="flex w-[15rem] shrink-0 flex-col overflow-y-auto border-r border-island-border bg-island-panel/50 p-3">
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setDragOver(false); void handleFiles(e.dataTransfer.files); }}
             onClick={() => fileRef.current?.click()}
             className={cn(
-              "mb-3 flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 border-dashed px-3 py-5 text-center transition-colors",
-              dragOver ? "border-claude-accent bg-claude-accentSoft/50" : "border-claude-border/80 bg-white/60 hover:border-claude-accent/50 hover:bg-white"
+              "mb-3 flex cursor-pointer flex-col items-center gap-1 rounded-island border-2 border-dashed px-3 py-5 text-center transition-all duration-200 ease-island",
+              dragOver ? "border-island-accent bg-island-accentSoft/60" : "border-island-borderStrong/50 bg-island-card/60 hover:-translate-y-px hover:border-island-accent/60 hover:bg-island-card"
             )}
           >
-            <UploadCloud size={20} className={cn(dragOver ? "text-claude-accent" : "text-claude-muted")} />
-            <div className="text-xs font-extrabold text-claude-ink">拖入或点击上传</div>
-            <div className="text-[10px] font-bold text-claude-muted">PDF / TXT / Markdown</div>
+            <UploadCloud size={20} className={cn(dragOver ? "text-island-accentDeep" : "text-island-muted")} />
+            <div className="text-xs font-extrabold text-island-ink">拖入或点击上传</div>
+            <div className="text-[10px] font-bold text-island-muted">PDF / TXT / Markdown</div>
           </div>
 
-          {isLoading && <div className="px-2 py-4 text-center text-xs text-claude-muted">加载中…</div>}
+          {isLoading && <div className="px-2 py-4 text-center text-xs text-island-muted">加载中…</div>}
           {(literatures ?? []).length === 0 && !isLoading && (
-            <div className="rounded-2xl border border-dashed border-claude-border bg-white/45 px-3 py-6 text-center text-xs font-semibold text-claude-muted">
+            <div className="rounded-island border-2 border-dashed border-island-borderStrong/40 bg-island-card/50 px-3 py-6 text-center text-xs font-semibold text-island-muted">
               还没有文献<br />导入一份开始阅读吧
             </div>
           )}
@@ -161,23 +161,23 @@ export default function LiteraturePage() {
               <div
                 key={lit.id}
                 className={cn(
-                  "group flex cursor-pointer items-start gap-2 rounded-2xl px-2.5 py-2 transition-colors",
-                  selectedId === lit.id ? "bg-white shadow-soft" : "hover:bg-white/75"
+                  "group flex cursor-pointer items-start gap-2 rounded-[16px] px-2.5 py-2 transition-colors",
+                  selectedId === lit.id ? "bg-island-card shadow-soft" : "hover:bg-island-card/70"
                 )}
                 onClick={() => setSelectedId(lit.id)}
               >
-                <FileText size={14} className="mt-0.5 shrink-0 text-island-coral" />
+                <FileText size={14} className="mt-0.5 shrink-0 text-island-orange" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-extrabold text-claude-ink">{lit.title}</div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-claude-muted">
-                    <span className="rounded-full bg-claude-panel px-1.5 py-px">{TYPE_LABEL[lit.source_type] ?? lit.source_type}</span>
+                  <div className="truncate text-xs font-extrabold text-island-ink">{lit.title}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-island-muted">
+                    <span className="rounded-full bg-island-panel px-1.5 py-px">{TYPE_LABEL[lit.source_type] ?? lit.source_type}</span>
                     <span>{lit.terms.length > 0 ? `${lit.terms.length} 个可点术语` : "未提取术语"}</span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void removeLiterature(lit); }}
-                  className="shrink-0 rounded-lg p-1 text-claude-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                  className="shrink-0 rounded-lg p-1 text-island-muted opacity-0 transition-opacity hover:bg-island-error/10 hover:text-island-error group-hover:opacity-100"
                   title="删除文献"
                 >
                   <Trash2 size={12} />
@@ -190,8 +190,8 @@ export default function LiteraturePage() {
         {/* 阅读视图 */}
         <div className="min-w-0 flex-1 overflow-y-auto">
           {!detail ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-claude-muted">
-              <ScrollText size={44} className="text-claude-accent/50" />
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-island-muted">
+              <ScrollText size={44} className="text-island-accent/60" />
               <p className="max-w-sm text-sm font-semibold">
                 导入 PDF / TXT / Markdown 文献，正文中的专业术语会被高亮标记——点击即可在旁边展开「深挖 / 对比 / 分支」探索卡片。
               </p>
@@ -199,13 +199,13 @@ export default function LiteraturePage() {
           ) : (
             <div className="mx-auto max-w-3xl px-6 py-6">
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-extrabold text-claude-ink">{detail.title}</h2>
+                <h2 className="text-base font-extrabold text-island-ink">{detail.title}</h2>
                 <Badge variant="accent">{TYPE_LABEL[detail.source_type] ?? detail.source_type}</Badge>
                 <button
                   type="button"
                   disabled={extractingId === detail.id}
                   onClick={() => void retryExtract(detail)}
-                  className="inline-flex items-center gap-1 rounded-full border bg-white px-2.5 py-1 text-[11px] font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:text-claude-accent disabled:opacity-50"
+                  className="btn-default h-7 px-2.5 text-[11px]"
                 >
                   {extractingId === detail.id ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
                   {detail.terms.length > 0 ? "重新提取术语" : "提取术语"}
@@ -213,17 +213,17 @@ export default function LiteraturePage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId(null)}
-                  className="inline-flex items-center gap-1 rounded-full border bg-white px-2.5 py-1 text-[11px] font-bold text-claude-muted transition-colors hover:text-claude-ink"
+                  className="btn-ghost h-7 px-2.5 text-[11px]"
                 >
                   <X size={12} /> 关闭
                 </button>
               </div>
               {extractingId === detail.id && (
-                <div className="mb-3 flex items-center gap-2 rounded-2xl border border-claude-accent/20 bg-claude-accentSoft/50 px-3 py-2 text-xs font-bold text-claude-accent">
+                <div className="mb-3 flex items-center gap-2 rounded-[16px] border border-island-accent/30 bg-island-accentSoft/60 px-3 py-2 text-xs font-bold text-island-accentDeep">
                   <Loader2 size={13} className="animate-spin" /> 正在从正文中提取可点击术语…
                 </div>
               )}
-              <div className="rounded-[1.5rem] border border-white bg-white/85 p-6 shadow-soft">
+              <div className="rounded-bubble border border-island-border bg-island-card p-6">
                 <Markdown terms={detail.terms} onTermClick={(term) => openTerm(term, detail.text.slice(0, 4000))}>
                   {detail.text}
                 </Markdown>
