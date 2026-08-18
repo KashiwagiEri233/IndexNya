@@ -52,37 +52,228 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// ============================================================
+// 数学公式归一化
+// ============================================================
+// 目标：把模型常见的各种 LaTeX 写法统一转换为 remark-math / rehype-katex
+// 能识别的 $...$（行内）与 $$...$$（块级，$$ 必须独占一行）。
+//
+// 处理顺序（每步都先保护已处理片段，避免后续正则误伤）：
+//   代码块 → $$...$$ 独立成行 → 多行 $...$ 升级块级 → \[...\] → \(...\)
+//   → \ce/\pu → 裸 \begin{env}...\end{env} → 单行 [ ... ] → 保护 $...$
+//   → 中文括号 (\alpha) → 保护 → 裸 LaTeX 命令 → 还原
+
+/** 数学命令白名单：命中即视为数学公式（白名单外命令如 \textbf 不误伤）。 */
+const MATH_COMMAND_SET = new Set([
+  // 分数 / 根式
+  "frac", "dfrac", "tfrac", "cfrac", "sqrt",
+  // 求和 / 积分 / 极限
+  "sum", "prod", "coprod", "int", "iint", "iiint", "iiiint", "oint",
+  "lim", "limsup", "liminf", "max", "min", "sup", "inf",
+  // 函数名
+  "log", "ln", "lg", "exp", "sin", "cos", "tan", "cot", "sec", "csc",
+  "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh", "coth", "sech", "csch",
+  "arg", "deg", "det", "dim", "ker", "Pr", "gcd", "hom", "argmax", "argmin",
+  // 希腊字母
+  "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta", "eta",
+  "theta", "vartheta", "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron",
+  "pi", "varpi", "rho", "varrho", "sigma", "varsigma", "tau", "upsilon",
+  "phi", "varphi", "chi", "psi", "omega",
+  "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Upsilon", "Phi", "Psi", "Omega",
+  // 运算符
+  "times", "cdot", "div", "pm", "mp", "ast", "star", "circ", "bullet",
+  "oplus", "otimes", "ominus", "oslash", "odot", "dagger", "ddagger", "amalg",
+  // 关系符
+  "leq", "geq", "neq", "approx", "equiv", "sim", "simeq", "cong", "propto",
+  "prec", "succ", "preceq", "succeq", "ll", "gg",
+  "subset", "supset", "subseteq", "supseteq", "subsetneq", "cup", "cap",
+  "setminus", "emptyset", "varnothing", "in", "notin", "ni",
+  "forall", "exists", "nexists",
+  "land", "lor", "lnot", "neg", "iff", "implies", "because", "therefore",
+  "mid", "nmid", "perp", "parallel", "angle", "triangle", "square", "prime", "top", "bot",
+  // 省略号 / 组合
+  "ldots", "cdots", "vdots", "ddots", "binom", "choose", "pmod", "bmod", "mod",
+  // 微积分 / 向量
+  "partial", "nabla", "infty", "aleph", "hbar", "ell", "imath", "jmath", "Re", "Im",
+  "vec", "hat", "bar", "tilde", "dot", "ddot",
+  "overrightarrow", "overleftarrow", "overline", "underline",
+  "overbrace", "underbrace", "overset", "underset", "stackrel",
+  // 定界符
+  "left", "right", "big", "Big", "bigg", "Bigg", "middle",
+  // 箭头
+  "rightarrow", "leftarrow", "leftrightarrow", "Rightarrow", "Leftarrow",
+  "Leftrightarrow", "mapsto", "to", "longrightarrow", "longleftarrow",
+  "uparrow", "downarrow", "updownarrow",
+  // 样式
+  "displaystyle", "textstyle", "scriptstyle", "scriptscriptstyle",
+  "mathrm", "mathbf", "mathit", "mathbb", "mathcal", "mathscr", "mathfrak",
+  "mathsf", "mathtt", "boldsymbol", "operatorname", "mbox", "quad", "qquad",
+  "tag", "not", "text",
+  // 化学（mhchem）
+  "ce", "pu",
+]);
+
+/** 判断一段文本是否含数学命令（白名单命中）。 */
+function looksLikeMath(expr: string): boolean {
+  const cmds = expr.match(/\\[A-Za-z]+/g) || [];
+  return cmds.some((c) => MATH_COMMAND_SET.has(c.slice(1)));
+}
+
+/** 判断字符是否属于数学表达式的一部分（ASCII 字母数字、LaTeX 符号、数学标点）。 */
+function isMathChar(ch: string | undefined): boolean {
+  if (!ch) return false;
+  const code = ch.charCodeAt(0);
+  if (ch === "\\" || ch === "{" || ch === "}" || ch === "[" || ch === "]" || ch === "(" || ch === ")") return true;
+  if (ch === " " || ch === "\t") return true;
+  if (code >= 0x30 && code <= 0x39) return true;
+  if (code >= 0x41 && code <= 0x5a) return true;
+  if (code >= 0x61 && code <= 0x7a) return true;
+  if ("=+-^_<>,;:!.*/|~·×÷√∑∫∏∞≈≠≤≥±∈∀∃→←⇒⇔∂∇′″".includes(ch)) return true;
+  return false;
+}
+
+/**
+ * 裸 LaTeX 命令 → 行内公式。
+ * 扫描白名单命令（\frac、\sum、\left 等），把命令 + 紧随的数学字符片段包裹成 $...$。
+ * 相邻片段自动合并（如 \left( \frac{a}{b} \right) 合并为一个公式）。
+ */
+function wrapBareLatex(text: string): string {
+  const cmdRe = /(^|[^\\])(\\(?:[A-Za-z]+\*?)(?:(?:\{(?:[^{}]|\{[^{}]*\})*\}|\[[^\]]*\])+)?)/g;
+  const spans: { start: number; end: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = cmdRe.exec(text)) !== null) {
+    const name = (m[2].match(/^\\([A-Za-z]+)/) || [])[1];
+    if (!MATH_COMMAND_SET.has(name)) continue;
+    let end = cmdRe.lastIndex;
+    while (end < text.length && isMathChar(text[end])) end++;
+    let start = m.index + m[1].length;
+    while (start > 0 && isMathChar(text[start - 1])) start--;
+    const candidate = text.slice(start, end).trim();
+    if (candidate && looksLikeMath(candidate)) spans.push({ start, end, text: candidate });
+  }
+  spans.sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number; text: string }[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s.start <= last.end) {
+      last.end = Math.max(last.end, s.end);
+      last.text = text.slice(last.start, last.end).trim();
+    } else {
+      merged.push({ ...s });
+    }
+  }
+  let out = text;
+  for (const s of merged.reverse()) {
+    out = out.slice(0, s.start) + `$${s.text}$` + out.slice(s.end);
+  }
+  return out;
+}
+
+/**
+ * 裸 \begin{env}...\end{env} → 块级公式（栈式匹配，支持嵌套环境）。
+ */
+function wrapEnvironments(text: string): string {
+  const out: string[] = [];
+  let i = 0;
+  const beginRe = /\\begin\{([A-Za-z*]+)\}/g;
+  while (i < text.length) {
+    beginRe.lastIndex = i;
+    const bm = beginRe.exec(text);
+    if (!bm) {
+      out.push(text.slice(i));
+      break;
+    }
+    out.push(text.slice(i, bm.index));
+    const env = bm[1];
+    const start = bm.index + bm[0].length;
+    // 栈式匹配：遇到 begin 入栈，遇到与栈顶匹配的 end 出栈
+    const stack = [env];
+    const re = /\\begin\{([A-Za-z*]+)\}|\\end\{([A-Za-z*]+)\}/g;
+    re.lastIndex = start;
+    let endMatch: RegExpExecArray | null = null;
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(text)) !== null) {
+      if (mm[1]) {
+        stack.push(mm[1]);
+      } else if (mm[2] === stack[stack.length - 1]) {
+        stack.pop();
+        if (stack.length === 0) {
+          endMatch = mm;
+          break;
+        }
+      }
+    }
+    if (!endMatch) {
+      out.push(bm[0]);
+      i = start;
+      continue;
+    }
+    const body = text.slice(start, endMatch.index);
+    out.push(`\n$$\n${bm[0]}${body}${endMatch[0]}\n$$\n`);
+    i = endMatch.index + endMatch[0].length;
+  }
+  return out.join("");
+}
+
 function normalizeMathDelimiters(markdown: string) {
-  let normalized = markdown
-    // 裸的 \ce{...}/\pu{...} 自动包成行内公式；已经在 $...$ 内的不会重复包裹。
-    .replace(/(^|[^$])\\(ce|pu)\{([^{}\n]+)\}/g, (_match, prefix: string, command: string, expression: string) => `${prefix}$\\${command}{${expression}}$`)
-    // \[ ... \] → display math；清理模型偶尔嵌入的多余 $。
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression: string) => `\n$$\n${expression.replace(/\$/g, "").trim()}\n$$\n`)
-    // \( ... \) → inline math；清理模型偶尔嵌入的多余 $。
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression: string) => `$${expression.replace(/\$/g, "").trim()}$`);
-
-  // 兼容模型常输出的单行 [ \theta = ... ] 块公式。
-  normalized = normalized.replace(/(^|\n)([ \t]*)\[([^\n]*\\[A-Za-z][^\n]*)\]([ \t]*)(?=\n|$)/g, (_match, prefix: string, indent: string, expression: string, suffix: string) => (
-    `${prefix}${indent}$$\n${expression.trim()}\n${indent}$$${suffix}`
-  ));
-
-  // 保护已经有 $...$ / $$...$$ 分隔符的公式，避免括号兼容规则嵌套进公式内部。
-  const mathBlocks: string[] = [];
-  normalized = normalized.replace(/\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\])+\$/g, (block) => {
-    const token = `__MATH_BLOCK_${mathBlocks.length}__`;
-    mathBlocks.push(block);
+  const protectedBlocks: string[] = [];
+  const protect = (block: string) => {
+    const token = `\u0000MATH${protectedBlocks.length}\u0000`;
+    protectedBlocks.push(block);
     return token;
+  };
+
+  let normalized = markdown.replace(/```[\s\S]*?```/g, protect);
+
+  // 0. $$...$$ → 独立成行（remark-math 要求 $$ 在行首），并清理内部多余 $
+  normalized = normalized.replace(/\$\$([\s\S]*?)\$\$/g, (_m, expr) => `\n$$\n${expr.replace(/\$/g, "").trim()}\n$$\n`);
+  normalized = normalized.replace(/\$\$[\s\S]*?\$\$/g, protect);
+
+  // 0.5 多行单 $...$ → 块级公式（模型常输出跨行单美元公式）
+  normalized = normalized.replace(/\$([\s\S]*?)\$/g, (m, expr) =>
+    expr.includes("\n") ? `\n$$\n${expr.replace(/\$/g, "").trim()}\n$$\n` : m
+  );
+  normalized = normalized.replace(/\$\$[\s\S]*?\$\$/g, protect);
+
+  // 1. \[ ... \] → 块级公式
+  normalized = normalized.replace(/\\\[([\s\S]*?)\\\]/g, (_m, expr) => `\n$$\n${expr.replace(/\$/g, "").trim()}\n$$\n`);
+  // 2. \( ... \) → 行内公式
+  normalized = normalized.replace(/\\\(([\s\S]*?)\\\)/g, (_m, expr) => `$${expr.replace(/\$/g, "").trim()}$`);
+  // 3. \ce{...} / \pu{...} → 行内公式
+  normalized = normalized.replace(/(^|[^$\\])\\(ce|pu)\{([^{}\n]+)\}/g, (_m, prefix, command, expr) => `${prefix}$\\${command}{${expr}}$`);
+
+  // 4. 裸 \begin{env}...\end{env} → 块级公式（栈式匹配）
+  normalized = wrapEnvironments(normalized);
+
+  // 5. 单行 [ ... ] 含 LaTeX → 块级公式
+  normalized = normalized.replace(/(^|\n)([ \t]*)\[([^\n]*\\[A-Za-z][^\n]*)\]([ \t]*)(?=\n|$)/g, (_m, prefix, indent, expr, suffix) =>
+    `${prefix}${indent}$$\n${expr.trim()}\n${indent}$$${suffix}`
+  );
+
+  // 6. 保护所有 $...$ / $$...$$（避免后续步骤破坏已识别的公式）
+  normalized = normalized.replace(/\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\])+\$/g, protect);
+
+  // 7. 中文文本中的 (\alpha) 等 → 行内公式（排除 \left( \big( 等 LaTeX 定界符）
+  normalized = normalized.replace(/(?<![A-Za-z\\])\((?=[^()\n]*\\[A-Za-z])((?:[^()\n]|\([^()\n]*\)[^()\n]*)+)\)/g, (m, expr) => {
+    const trimmed = expr.trim();
+    return trimmed && looksLikeMath(trimmed) ? `$${trimmed}$` : m;
   });
 
-  // 兼容中文文本中的 (\alpha)、(\nabla f(\theta)) 等未加分隔符的常见写法。
-  normalized = normalized.replace(/\((?=[^()\n]*\\[A-Za-z])((?:[^()\n]|\([^()\n]*\)[^()\n]*)+)\)/g, (_match, expression: string) => `$${expression.trim()}$`);
-  normalized = normalized.replace(/__MATH_BLOCK_(\d+)__/g, (_match, index: string) => mathBlocks[Number(index)]);
+  // 8. 再次保护（步骤 7 新产生的 $...$）
+  normalized = normalized.replace(/\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\])+\$/g, protect);
+
+  // 9. 裸 LaTeX 命令 → 行内公式
+  normalized = wrapBareLatex(normalized);
+
+  // 10. 还原占位符
+  normalized = normalized.replace(/\u0000MATH(\d+)\u0000/g, (_m, index) => protectedBlocks[Number(index)]);
   return normalized;
 }
 
 /**
  * 在 Markdown AST 的 text 节点中插入 link 节点，再由 a renderer 转成按钮。
  * 直接替换原始 Markdown 文本会破坏 **粗体**、列表和链接语法。
+ * 跳过 math / inlineMath 节点，避免术语替换进入 KaTeX 公式内部破坏公式。
  */
 function remarkTerms(options: { terms: ChatTerm[] }) {
   const terms = [...(options.terms || [])]
@@ -93,7 +284,8 @@ function remarkTerms(options: { terms: ChatTerm[] }) {
 
   return (tree: any) => {
     function walk(node: any) {
-      if (!node.children || node.type === "link" || node.type === "linkReference" || node.type === "code" || node.type === "inlineCode") return;
+      if (!node.children) return;
+      if (node.type === "link" || node.type === "linkReference" || node.type === "code" || node.type === "inlineCode" || node.type === "math" || node.type === "inlineMath") return;
       const next: any[] = [];
       for (const child of node.children) {
         if (child.type !== "text") {
@@ -140,7 +332,7 @@ export function Markdown({
     <div className="prose-claude">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath, [remarkTerms as any, { terms }]]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}
         components={{
           code({ inline, className, children: c, ...props }: any) {
             const text = String(c ?? "");
