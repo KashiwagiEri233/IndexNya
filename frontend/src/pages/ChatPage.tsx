@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Send, Sparkles, FileText, Map as MapIcon, Loader2, Paperclip,
   Code, ListChecks, BookOpen, HelpCircle, PanelRight, GitBranch, X, Pencil, Trash2, Quote as QuoteIcon,
-  Brain, Search, ArrowUpRight, ArrowRight, ArrowDown, Wand2, ClipboardCheck, PenLine,
+  Brain, Search, ArrowUpRight, ArrowRight, ArrowDown, ClipboardCheck, PenLine,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Markdown } from "@/components/chat/Markdown";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { ExploreDock } from "@/components/explore/ExploreDock";
 import { openExploreCard } from "@/lib/explore";
-import { api, type ChatModel, type ChatTerm, type Skill } from "@/lib/api";
+import { api, type ChatModel, type ChatTerm } from "@/lib/api";
 import { useAppStore } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
@@ -158,12 +158,10 @@ function msgFromRow(m: any): ChatMsg {
 
 function SideChatPanel({
   conversationId,
-  studentId,
   model,
   onClose,
 }: {
   conversationId: number;
-  studentId: number;
   model?: ChatModel;
   onClose: () => void;
 }) {
@@ -251,7 +249,7 @@ function SideChatPanel({
     setBusy(true);
     try {
       await api.chatStream(
-        { conversation_id: conversationId, student_id: studentId, message: text, model: toRequestModel(model), context },
+        { conversation_id: conversationId, message: text, model: toRequestModel(model), context },
         {
           onToken: (token) => setMessages((current) => {
             const next = [...current];
@@ -372,7 +370,6 @@ function SideChatPanel({
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const student = useAppStore((s) => s.student);
   const convId = useAppStore((s) => s.convId);
   const setConvId = useAppStore((s) => s.setConvId);
   const bumpConversations = useAppStore((s) => s.bumpConversations);
@@ -385,25 +382,18 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingResource, setPendingResource] = useState<string | null>(null);
-  const [pendingSkill, setPendingSkill] = useState<string | null>(null);
   const [quizMode, setQuizMode] = useState(false);
-  const [skills, setSkills] = useState<Skill[]>([]);
   const [sideConvId, setSideConvId] = useState<number | null>(null);
   const [sideModel, setSideModel] = useState<ChatModel | undefined>();
   const scrollRef = useRef<HTMLDivElement>(null);
   // 首条消息创建新会话时，onMeta 会更新 convId；跳过这一次历史拉取，避免覆盖正在流式生成的本地消息。
   const skipHistoryLoadForRef = useRef<number | null>(null);
 
-  // 拉取可用技能目录（来源：backend/app/skills/*.md）
-  useEffect(() => {
-    api.listSkills().then(setSkills).catch(() => setSkills([]));
-  }, []);
-
   // 错题本「重练错题」一键直达：自动发送拼好的消息并清空待发状态
   const pendingPracticeMessage = useAppStore((s) => s.pendingPracticeMessage);
   const setPendingPracticeMessage = useAppStore((s) => s.setPendingPracticeMessage);
   useEffect(() => {
-    if (pendingPracticeMessage && student) {
+    if (pendingPracticeMessage) {
       const text = pendingPracticeMessage.text;
       setPendingPracticeMessage(null);
       void send(text);
@@ -483,7 +473,7 @@ export default function ChatPage() {
 
   /** 选中任意文本（名词之外的内容）→ 打开追问卡片。 */
   function openSelectionFollowUp(text: string, bubbleText: string) {
-    if (!student || !text) return;
+    if (!text) return;
     const clean = text.replace(/\s+/g, " ").trim();
     openExploreCard({
       term: clean.slice(0, 40),
@@ -495,7 +485,7 @@ export default function ChatPage() {
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim();
-    if (!text || busy || !student) return;
+    if (!text || busy) return;
     if (!selectedModel) {
       alert("请先添加并选择一个对话模型。");
       return;
@@ -508,9 +498,6 @@ export default function ChatPage() {
       await generateResource(type, text);
       return;
     }
-    // 显式点选了技能：走技能执行分支（chat 流式回答，按技能说明执行）
-    const skillToUse = (!textOverride && pendingSkill) || undefined;
-    if (pendingSkill) setPendingSkill(null);
     const useQuizMode = !textOverride && quizMode;
     if (quizMode) setQuizMode(false);
     setInput("");
@@ -529,9 +516,7 @@ export default function ChatPage() {
       await api.chatStream(
         {
           conversation_id: convId ?? undefined,
-          student_id: student.id,
           message: text,
-          skill: skillToUse,
           mode: useQuizMode ? "quiz_session" : undefined,
           model: toRequestModel(selectedModel),
           context,
@@ -635,7 +620,7 @@ export default function ChatPage() {
   }
 
   async function generateResource(type: string, topic: string) {
-    if (!student || !topic.trim()) return;
+    if (!topic.trim()) return;
     topic = topic.trim();
     setBusy(true);
     setMessages((m) => [
@@ -645,7 +630,7 @@ export default function ChatPage() {
     ]);
     const assistantIdx = messages.length + 1;
     try {
-      const r = await api.generateResource({ student_id: student.id, type, topic, conversation_id: convId ?? undefined, model: toRequestModel(selectedModel) });
+      const r = await api.generateResource({ type, topic, conversation_id: convId ?? undefined, model: toRequestModel(selectedModel) });
       let preview = "";
       if (r.type === "mindmap" && r.content?.markdown) {
         preview = `✅ 已生成思维导图：\n\n${r.content.markdown}`;
@@ -680,7 +665,6 @@ export default function ChatPage() {
   const [pendingImage, setPendingImage] = useState<File | null>(null);
 
   async function handleImageUpload(file: File) {
-    if (!student) return;
     if (!file.type.startsWith("image/")) {
       alert("只能上传图片文件");
       return;
@@ -701,7 +685,7 @@ export default function ChatPage() {
     ]);
     const assistantIdx = messages.length + 1;
     try {
-      const res = await api.understandImage(student.id, file, question);
+      const res = await api.understandImage(file, question);
       let content = res.answer || res.recognition || "（无识别结果）";
       if (res.recognition && res.answer && res.recognition !== res.answer) {
         content = `**识别内容：**\n\n${res.recognition}\n\n---\n\n**针对性解答：**\n\n${res.answer}`;
@@ -728,7 +712,6 @@ export default function ChatPage() {
 
   /** 哪里不懂点哪里 — 点击术语打开探索卡片（先进入提问编辑态）。 */
   function openTerm(term: ChatTerm, context: string, message?: ChatMsg) {
-    if (!student) return;
     openExploreCard({
       term: term.text,
       explanation: term.explanation,
@@ -742,7 +725,6 @@ export default function ChatPage() {
 
   /** assistant 消息悬浮按钮：深挖 / 发散 / 分支。 */
   function openExploreFromMessage(message: ChatMsg, mode: "child" | "related" | "branch") {
-    if (!student) return;
     const term = topicOf(message);
     openExploreCard({
       term,
@@ -856,20 +838,6 @@ export default function ChatPage() {
                   </div>
                 ))}
               </div>
-              {skills.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-[11px] font-bold text-claude-muted">可用技能</div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 max-w-lg mx-auto text-left">
-                    {skills.map((s) => (
-                      <button key={s.name} type="button" onClick={() => { setPendingSkill(pendingSkill === s.name ? null : s.name); if (pendingSkill !== s.name) setPendingResource(null); }} className={cn("card p-3 text-sm text-left", pendingSkill === s.name && "ring-2 ring-claude-accent/60")}>
-                        <Wand2 size={16} className="text-island-lavender mb-1" />
-                        <div className="font-medium">{s.title}</div>
-                        <div className="text-[10px] leading-4 text-claude-muted line-clamp-2">{s.description}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {messages.map((m, i) => (
@@ -1017,7 +985,7 @@ export default function ChatPage() {
               <button
                 key={a.type}
                 disabled={busy}
-                onClick={() => { setPendingResource(selected ? null : a.type); if (!selected) setPendingSkill(null); }}
+                onClick={() => { setPendingResource(selected ? null : a.type); }}
                 className={
                   "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
                   (selected
@@ -1035,7 +1003,7 @@ export default function ChatPage() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => { setQuizMode(!quizMode); setPendingResource(null); setPendingSkill(null); }}
+            onClick={() => { setQuizMode(!quizMode); setPendingResource(null); }}
             className={
               "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
               (quizMode
@@ -1047,32 +1015,6 @@ export default function ChatPage() {
             <PenLine size={13} />
             刷题练习
           </button>
-          {skills.length > 0 && (
-            <>
-              <span className="mx-1 h-4 w-px bg-claude-border/70" />
-              <span className="text-[10px] font-bold text-claude-muted">技能</span>
-              {skills.map((s) => {
-                const selected = pendingSkill === s.name;
-                return (
-                  <button
-                    key={s.name}
-                    disabled={busy}
-                    onClick={() => { setPendingSkill(selected ? null : s.name); if (!selected) setPendingResource(null); }}
-                    className={
-                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 " +
-                      (selected
-                        ? "bg-island-lavender text-white border-island-lavender"
-                        : "bg-white hover:bg-island-lavender/10 hover:border-island-lavender/40")
-                    }
-                    title={selected ? `已选择技能「${s.title}」，输入主题后发送` : `使用技能「${s.title}」：${s.description}`}
-                  >
-                    <Wand2 size={13} />
-                    {s.title}
-                  </button>
-                );
-              })}
-            </>
-          )}
         </div>
       </div>
 
@@ -1110,8 +1052,6 @@ export default function ChatPage() {
                   ? "图片已选择，输入问题后点上传…"
                   : pendingResource
                   ? `已选择${RESOURCE_ACTIONS.find(a => a.type === pendingResource)?.label}，输入主题后按回车生成…`
-                  : pendingSkill
-                  ? `已选择技能「${skills.find(s => s.name === pendingSkill)?.title ?? pendingSkill}」，输入主题后按回车执行…`
                   : quizMode
                   ? "已选择「互动刷题」，输入想练习的主题后按回车开始（也可直接回车）…"
                   : "输入问题或学习目标…（Shift+Enter 换行；选中回答文本可引用）"
@@ -1145,10 +1085,9 @@ export default function ChatPage() {
         </div>
       </div>
       </div>
-      {sideConvId && student && (
+      {sideConvId && (
         <SideChatPanel
           conversationId={sideConvId}
-          studentId={student.id}
           model={sideModel}
           onClose={() => { setSideConvId(null); setSideModel(undefined); }}
         />

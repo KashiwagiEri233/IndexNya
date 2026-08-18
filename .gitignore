@@ -10,6 +10,7 @@ venv/
 *.db-journal
 backend/uploads/
 backend/outputs/
+backend/app/skills/settings.json
 node_modules/
 dist/
 .DS_Store

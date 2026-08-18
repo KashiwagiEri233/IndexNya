@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 const TYPE_LABEL: Record<string, string> = { pdf: "PDF", txt: "TXT", md: "Markdown" };
 
 export default function LiteraturePage() {
-  const student = useAppStore((s) => s.student);
   const literatureVersion = useAppStore((s) => s.literatureVersion);
   const bumpLiteratures = useAppStore((s) => s.bumpLiteratures);
   const [uploading, setUploading] = useState(false);
@@ -23,9 +22,8 @@ export default function LiteraturePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: literatures, isLoading } = useQuery({
-    queryKey: ["literatures", student?.id, literatureVersion],
-    queryFn: () => (student ? api.listLiteratures(student.id) : []),
-    enabled: !!student,
+    queryKey: ["literatures", literatureVersion],
+    queryFn: () => api.listLiteratures(),
   });
 
   useEffect(() => {
@@ -43,11 +41,11 @@ export default function LiteraturePage() {
   }, [selectedId, literatureVersion]);
 
   async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0 || !student) return;
+    if (!files || files.length === 0) return;
     const file = files[0];
     setUploading(true);
     try {
-      const lit = await api.uploadLiterature(student.id, file);
+      const lit = await api.uploadLiterature(file);
       bumpLiteratures();
       setSelectedId(lit.id);
       // 自动提取术语（哪里不懂点哪里）
@@ -73,7 +71,6 @@ export default function LiteraturePage() {
   }
 
   async function retryExtract(lit: Literature) {
-    if (!student) return;
     setExtractingId(lit.id);
     try {
       const model = resolveModel();
@@ -99,7 +96,6 @@ export default function LiteraturePage() {
   }
 
   function openTerm(term: ChatTerm, context: string) {
-    if (!student) return;
     openExploreCard({
       term: term.text,
       explanation: term.explanation,

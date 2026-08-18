@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 from openai import AsyncOpenAI
 
@@ -105,24 +105,54 @@ async def chat_stream(
     *,
     temperature: float = 0.7,
     max_tokens: int = 4096,
+    tools: Optional[list[dict]] = None,
+    tool_choice: Optional[str] = None,
+    on_tool_calls: Optional[Callable[[list[dict]], None]] = None,
 ) -> AsyncIterator[str]:
-    """流式补全，yield 增量文本 chunk。"""
+    """流式补全，yield 增量文本 chunk。
+
+    tools/tool_choice: 透传给模型（OpenAI 兼容 function calling）；
+    on_tool_calls: 流结束后回调收集到的工具调用列表 [{name, arguments}]（无则空列表）。
+    """
     llm = get_llm()
     model, _, _ = _model_settings()
-    stream = await llm.chat.completions.create(
+    kwargs: dict[str, Any] = dict(
         model=model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
         stream=True,
     )
+    if tools:
+        kwargs["tools"] = tools
+        if tool_choice:
+            kwargs["tool_choice"] = tool_choice
+    stream = await llm.chat.completions.create(**kwargs)
+    tool_parts: dict[int, dict] = {}
     async for chunk in stream:
         try:
             delta = chunk.choices[0].delta
-            if delta and getattr(delta, "content", None):
-                yield delta.content
         except (IndexError, AttributeError):
             continue
+        if delta and getattr(delta, "content", None):
+            yield delta.content
+        for call in (getattr(delta, "tool_calls", None) or []):
+            try:
+                idx = int(call.index)
+            except (TypeError, ValueError):
+                idx = len(tool_parts)
+            part = tool_parts.setdefault(idx, {"name": "", "arguments": ""})
+            fn = getattr(call, "function", None)
+            if fn is not None:
+                if getattr(fn, "name", None):
+                    part["name"] += fn.name
+                if getattr(fn, "arguments", None):
+                    part["arguments"] += fn.arguments
+    if on_tool_calls is not None:
+        on_tool_calls([
+            {"name": part["name"], "arguments": part["arguments"]}
+            for _, part in sorted(tool_parts.items())
+        ])
 
 
 async def json_complete(

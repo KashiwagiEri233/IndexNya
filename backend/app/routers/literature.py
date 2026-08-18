@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from ..agents.terms import extract_terms
 from ..db import get_db
 from ..llm.factory import reset_active_model, set_active_model
-from ..models import Literature, Student
+from ..models import Literature
 from ..schemas import LiteratureDetailOut, LiteratureOut, LiteratureTermsRequest
 
 router = APIRouter()
@@ -77,13 +77,14 @@ async def _extract_terms_from_text(text: str, model: dict[str, Any] | None) -> l
 
 @router.post("/upload", response_model=LiteratureOut)
 async def upload(
-    student_id: int = Form(...),
+    student_id: int | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> LiteratureOut:
     """上传文献（PDF/TXT/MD），提取正文并入库（术语随后用 POST /{id}/terms 提取）。"""
-    if not db.get(Student, student_id):
-        raise HTTPException(404, "student not found")
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
     raw = await file.read()
     if len(raw) > MAX_SIZE:
         raise HTTPException(400, f"文件过大（{len(raw) // 1024 // 1024}MB），上限 10MB")
@@ -99,7 +100,7 @@ async def upload(
 
     title = (file.filename or "未命名").rsplit(".", 1)[0][:120]
     lit = Literature(
-        student_id=student_id,
+        student_id=sid,
         title=title,
         source_type=source_type,
         text=text[:MAX_TEXT],
@@ -133,10 +134,13 @@ async def extract_literature_terms(
 
 
 @router.get("", response_model=list[LiteratureOut])
-def list_literatures(student_id: int, db: Session = Depends(get_db)) -> list[LiteratureOut]:
+def list_literatures(student_id: int | None = None, db: Session = Depends(get_db)) -> list[LiteratureOut]:
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
     rows = (
         db.query(Literature)
-        .filter(Literature.student_id == student_id)
+        .filter(Literature.student_id == sid)
         .order_by(Literature.created_at.desc())
         .all()
     )

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, User, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
+import { BookOpen, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -93,8 +93,6 @@ function CardTree({
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const student = useAppStore((s) => s.student);
-  const studentId = student?.id;
   const convId = useAppStore((s) => s.convId);
   const setConvId = useAppStore((s) => s.setConvId);
   const conversationVersion = useAppStore((s) => s.conversationVersion);
@@ -104,15 +102,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const { data: conversations } = useQuery({
-    queryKey: ["conversations", studentId, conversationVersion],
-    queryFn: () => (studentId ? api.getConversations(studentId) : []),
-    enabled: !!studentId,
+    queryKey: ["conversations", conversationVersion],
+    queryFn: () => api.getConversations(),
   });
 
   const { data: cards } = useQuery({
-    queryKey: ["cards", studentId, cardVersion],
-    queryFn: () => (studentId ? api.listCards(studentId) : []),
-    enabled: !!studentId,
+    queryKey: ["cards", cardVersion],
+    queryFn: () => api.listCards(),
   });
 
   function newConversation() {
@@ -344,14 +340,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="relative m-3 rounded-2xl border border-white bg-white/75 p-3 shadow-soft">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-island-peach text-island-coral"><User size={15} /></div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-extrabold">{student?.name || "新用户"}</div>
-              <div className="text-[10px] font-bold text-claude-muted">准备好开始学习了吗？</div>
-            </div>
-          </div>
-          <button type="button" onClick={() => navigate("/settings")} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
+          <button type="button" onClick={() => navigate("/settings")} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-claude-border/70 bg-white px-2 py-2 text-xs font-bold text-claude-muted transition-colors hover:border-claude-accent/40 hover:bg-claude-accentSoft hover:text-claude-accent" title="打开设置">
             <Settings size={13} /> 设置
           </button>
         </div>

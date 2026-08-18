@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import Any, AsyncIterator
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -39,7 +39,7 @@ from ..services.quiz_service import (
 )
 from ..skills.manager import get_skill, list_skills
 from ..db import get_db
-from ..models import Conversation, ExploreCard, Message, PracticeRecord, Student
+from ..models import Conversation, ExploreCard, Message, PracticeRecord
 from ..schemas import BranchConversationRequest, ChatModelConfig, ChatRequest, MessageUpdate
 from ..services.conversation_service import (
     branch_conversation as create_branch_conversation,
@@ -78,7 +78,11 @@ _KEYWORD_ROUTES: list[tuple[re.Pattern, str, str | None]] = [
 
 
 def _keyword_route(message: str) -> dict | None:
-    """阶段A-2：本地关键词快速路由。未命中返回 None，由调用方决定是否走轻量 LLM 判定。"""
+    """阶段A-2：本地关键词快速路由。未命中返回 None，由调用方决定是否走轻量 LLM 判定。
+
+    技能不在此路由：技能由对话 Agent 依据系统提示词中的技能目录
+    自行触发，经 use_skill 工具加载执行。
+    """
     text = (message or "").strip()
     if not text:
         return None
@@ -88,10 +92,6 @@ def _keyword_route(message: str) -> dict | None:
             if action == "quiz_session":
                 route.pop("resource_type", None)
             return route
-    # 技能名/标题命中（如“记忆卡片”“复习计划”）→ 直接使用该技能
-    for skill in list_skills():
-        if skill.title and skill.title in text:
-            return {"action": "skill", "skill": skill.name, "topic": text[:40]}
     return None
 
 
@@ -106,12 +106,6 @@ def _template_main_plan(route: dict, message: str) -> dict:
             "resource_type": rtype,
             "tasks": [{"agent": rtype, "instruction": "完成当前请求"}],
             "acceptance": ["结果与用户请求相关", "结果可以直接展示给用户"],
-        })
-    elif action == "skill":
-        plan.update({
-            "skill": route.get("skill"),
-            "tasks": [{"agent": "conversation", "instruction": "按该技能的说明处理当前请求"}],
-            "acceptance": ["结果符合技能要求", "结果可以直接展示给用户"],
         })
     elif action == "quiz_session":
         plan.update({
@@ -131,6 +125,68 @@ def _template_main_plan(route: dict, message: str) -> dict:
             "acceptance": ["回答与用户问题相关", "结论清晰且没有空结果"],
         })
     return plan
+
+
+def _use_skill_tool() -> dict | None:
+    """构建 use_skill 工具（动态枚举已开启技能）；没有已开启技能时返回 None。
+
+    技能目录（名称+描述）已在系统提示词中，本工具是
+    「读取 SKILL.md 完整指令」的机制——Agent 决定使用某个技能时调用它。
+    """
+    skills = [s for s in list_skills() if s.enabled]
+    if not skills:
+        return None
+    return {
+        "type": "function",
+        "function": {
+            "name": "use_skill",
+            "description": "当用户明确提到某个技能名，或当前请求明显匹配技能清单中某技能的描述时，调用它以加载该技能的完整执行指令；调用后系统会按该技能执行并输出结果。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill": {
+                        "type": "string",
+                        "enum": [s.name for s in skills],
+                        "description": "要使用的技能名（必须是枚举中的值）",
+                    },
+                    "topic": {"type": "string", "description": "本次请求的主题（简短）"},
+                },
+                "required": ["skill"],
+            },
+        },
+    }
+
+
+def _find_use_skill_call(tool_calls: list[dict]) -> dict | None:
+    """从模型返回的工具调用中解析第一个 use_skill 的有效参数。"""
+    for call in tool_calls or []:
+        if str(call.get("name") or "") != "use_skill":
+            continue
+        try:
+            data = json.loads(str(call.get("arguments") or "{}"))
+        except Exception:
+            continue
+        if isinstance(data, dict) and data.get("skill"):
+            return data
+    return None
+
+
+async def _stream_skill_answer(agent, skill, topic: str, history: list[dict] | None, payload) -> AsyncIterator[str]:
+    """按技能指令流式作答（agent 通过 use_skill 工具触发技能后执行）。"""
+    extra_context_parts: list[str] = []
+    if payload.context:
+        extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
+    extra_context_parts.append(
+        f"当前正在使用技能「{skill.title}」（{skill.name}），请求主题：{topic or payload.message}\n\n"
+        f"【技能执行说明，请严格遵守】\n{skill.content}"
+    )
+    extra_context = "\n\n".join(extra_context_parts)
+    async for chunk in agent.stream_answer(
+        payload.message,
+        history=history,
+        extra_context=extra_context,
+    ):
+        yield chunk
 
 
 def _active_quiz_session(db: Session, conversation_id: int) -> dict | None:
@@ -220,15 +276,10 @@ async def _stream_chat_impl(
     payload: ChatRequest,
 ) -> AsyncIterator[str]:
     """生成 SSE 事件流。"""
-    # 1. 解析 / 创建学生与对话
-    student = None
-    if payload.student_id:
-        student = db.get(Student, payload.student_id)
-    if not student:
-        student = Student(name="同学")
-        db.add(student)
-        db.commit()
-        db.refresh(student)
+    # 1. 解析本地单用户（本地模式：不区分学生）与对话
+    from ..services.student_service import get_local_student
+
+    student = get_local_student(db)
 
     conv = None
     if payload.conversation_id:
@@ -284,16 +335,12 @@ async def _stream_chat_impl(
         else:
             route = {"action": "resource", "resource_type": explicit, "topic": payload.message}
         main_plan = _template_main_plan(route, payload.message)
-    elif payload.skill:
-        # 用户在前端显式点选技能：直接按该技能执行。
-        route = {"action": "skill", "skill": payload.skill, "topic": payload.message}
-        main_plan = _template_main_plan(route, payload.message)
     else:
         route = _keyword_route(payload.message)
         if route is None:
             # 关键词未命中 → 轻量意图判定（需求确定后才调用功能 prompt）
             try:
-                route = await MainAgent().route_light(payload.message, profile, history)
+                route = await MainAgent().route_light(payload.message, history)
             except Exception as e:
                 logger.warning("light routing error: %s, fallback to chat", e)
                 route = {"action": "chat", "topic": payload.message}
@@ -315,7 +362,6 @@ async def _stream_chat_impl(
     yield _sse("route", {
         "action": route.get("action", "chat"),
         "resource_type": route.get("resource_type"),
-        "skill": route.get("skill"),
         "topic": route.get("topic", ""),
     })
 
@@ -326,14 +372,8 @@ async def _stream_chat_impl(
     # 5. 主 Agent 通过通用调度器派发一次性 subagent。
     from ..agents.scheduler import AgentContext, AgentTask, build_default_scheduler
 
-    # 技能解析：action=skill 时加载技能说明；技能不存在则降级为普通对话。
+    # 技能执行信息（agent 通过 use_skill 工具触发技能时写入）
     skill = None
-    if action == "skill":
-        skill = get_skill(str(route.get("skill") or ""))
-        if skill is None:
-            logger.warning("skill not found: %s, fallback to chat", route.get("skill"))
-            action = "chat"
-            route["action"] = "chat"
 
     # 互动刷题会话状态（quiz_session 分支写入，其余动作保持 None）
     quiz_session_state = None
@@ -406,38 +446,6 @@ async def _stream_chat_impl(
                 "status": "failed",
                 "detail": str(e),
             })
-    elif action == "skill":
-        # 技能执行：把技能指令注入上下文，由文本模型按指令流式作答。
-        assert skill is not None
-        yield _sse("skill", {"skill": skill.name, "title": skill.title, "description": skill.description})
-        yield _sse("progress", {
-            "phase": "skill",
-            "agent": "skill",
-            "status": "running",
-            "detail": f"正在使用技能「{skill.title}」处理你的请求。",
-        })
-        agent = MainAgent()
-        extra_context_parts: list[str] = []
-        if payload.context:
-            extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
-        extra_context_parts.append(
-            f"当前正在使用技能「{skill.title}」（{skill.name}），请求主题：{route.get('topic') or payload.message}\n\n"
-            f"【技能执行说明，请严格遵守】\n{skill.content}"
-        )
-        extra_context = "\n\n".join(extra_context_parts)
-        try:
-            async for chunk in agent.stream_answer(
-                payload.message,
-                history=history,
-                extra_context=extra_context,
-            ):
-                full_text_parts.append(chunk)
-                yield _sse("token", {"text": chunk})
-            yield _sse("progress", {"phase": "skill", "agent": "skill", "status": "completed", "detail": "技能执行完成，准备验收。"})
-        except Exception as e:
-            logger.exception("skill execution failed: %s", skill.name)
-            yield _sse("error", {"message": str(e)})
-            return
     elif action == "quiz_session":
         # 互动刷题：用 ask_question 工具逐题提问，等学生作答后再批改与出下一题。
         yield _sse("progress", {
@@ -518,19 +526,39 @@ async def _stream_chat_impl(
     else:
         yield _sse("progress", {"phase": "main", "agent": "main", "status": "running", "detail": "主 Agent 正在直接生成回答。"})
         # 普通对话由 MainAgent 直接流式回答，不派发 conversation subagent。
+        # 挂载 use_skill 工具（agent 工具模式）：模型可在对话中主动调用技能。
         agent = MainAgent()
         extra_context_parts: list[str] = []
         if payload.context:
             extra_context_parts.append(f"当前子对话聚焦上下文：{payload.context[:4000]}")
         extra_context = "\n\n".join(extra_context_parts)
+        skill_tool = _use_skill_tool()
+        tool_collector: list[dict] = []
         try:
             async for chunk in agent.stream_answer(
                 payload.message,
                 history=history,
                 extra_context=extra_context,
+                tools=[skill_tool] if skill_tool else None,
+                on_tool_calls=tool_collector.extend if skill_tool else None,
             ):
                 full_text_parts.append(chunk)
                 yield _sse("token", {"text": chunk})
+            # 模型主动调用 use_skill → 按该技能执行
+            skill_call = _find_use_skill_call(tool_collector)
+            if skill_call:
+                invoked = get_skill(str(skill_call.get("skill") or ""))
+                if invoked is not None and invoked.enabled:
+                    skill = invoked
+                    action = "skill"
+                    yield _sse("skill", {"skill": skill.name, "title": skill.title, "description": skill.description})
+                    yield _sse("progress", {"phase": "skill", "agent": "skill", "status": "running", "detail": f"正在使用技能「{skill.title}」处理你的请求。"})
+                    async for chunk in _stream_skill_answer(agent, skill, str(skill_call.get("topic") or ""), history, payload):
+                        full_text_parts.append(chunk)
+                        yield _sse("token", {"text": chunk})
+                    yield _sse("progress", {"phase": "skill", "agent": "skill", "status": "completed", "detail": "技能执行完成，准备验收。"})
+                else:
+                    logger.warning("use_skill invoked unavailable skill: %s", skill_call.get("skill"))
             yield _sse("progress", {"phase": "main", "agent": "main", "status": "completed", "detail": "主 Agent 已完成直接回答，准备验收。"})
         except Exception as e:
             logger.exception("main agent chat stream failed")
@@ -793,10 +821,16 @@ def list_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[d
 
 
 @router.get("/conversations")
-def list_conversations(student_id: int, db: Session = Depends(get_db)) -> list[dict]:
+def list_conversations(
+    student_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
     convs = (
         db.query(Conversation)
-        .filter(Conversation.student_id == student_id)
+        .filter(Conversation.student_id == sid)
         .order_by(Conversation.created_at.desc())
         .all()
     )

@@ -234,8 +234,9 @@ async def explore(payload: ExploreRequest, db: Session = Depends(get_db)) -> Str
     """打开/重新生成一张探索卡片（SSE 流式）。"""
     if not (payload.term or "").strip():
         raise HTTPException(400, "term is required")
-    if not db.get(Student, payload.student_id):
-        raise HTTPException(404, "student not found")
+    from ..services.student_service import get_local_student_id
+
+    payload.student_id = payload.student_id or get_local_student_id(db)
     return StreamingResponse(
         _stream_explore(db, payload),
         media_type="text/event-stream",
@@ -248,11 +249,14 @@ async def explore(payload: ExploreRequest, db: Session = Depends(get_db)) -> Str
 
 
 @router.get("/cards", response_model=list[CardOut])
-def list_cards(student_id: int, db: Session = Depends(get_db)) -> list[CardOut]:
-    """返回该学生的全部探索卡片（前端按 conversation_id 分组、按 parent 组树）。"""
+def list_cards(student_id: int | None = None, db: Session = Depends(get_db)) -> list[CardOut]:
+    """返回全部探索卡片（前端按 conversation_id 分组、按 parent 组树）。"""
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
     rows = (
         db.query(ExploreCard)
-        .filter(ExploreCard.student_id == student_id)
+        .filter(ExploreCard.student_id == sid)
         .order_by(ExploreCard.created_at.desc())
         .all()
     )

@@ -49,22 +49,28 @@ async def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)) -> d
     }
 
 
-@router.get("/{student_id}", response_model=list[UnderstandingOut])
-def list_all(student_id: int, db: Session = Depends(get_db)) -> list[UnderstandingOut]:
-    return [UnderstandingOut.model_validate(u) for u in list_understandings(db, student_id)]
+@router.get("", response_model=list[UnderstandingOut])
+def list_all(student_id: int | None = None, db: Session = Depends(get_db)) -> list[UnderstandingOut]:
+    from ..services.student_service import get_local_student_id
+
+    return [UnderstandingOut.model_validate(u) for u in list_understandings(db, student_id or get_local_student_id(db))]
 
 
-@router.get("/{student_id}/graph", response_model=UniverseGraphOut)
-def graph(student_id: int, db: Session = Depends(get_db)) -> dict:
-    return build_graph(db, student_id)
+@router.get("/graph", response_model=UniverseGraphOut)
+def graph(student_id: int | None = None, db: Session = Depends(get_db)) -> dict:
+    from ..services.student_service import get_local_student_id
+
+    return build_graph(db, student_id or get_local_student_id(db))
 
 
-@router.get("/{student_id}/anchors", response_model=AnchorOut)
-def anchors(student_id: int, topic: str, db: Session = Depends(get_db)) -> dict:
+@router.get("/anchors", response_model=AnchorOut)
+def anchors(student_id: int | None = None, topic: str = "", db: Session = Depends(get_db)) -> dict:
     """锚点探测：讲解某新概念时会调用哪些已掌握的理解。"""
+    from ..services.student_service import get_local_student_id
+
     return {
         "topic": topic,
-        "anchors": related_dicts(db, student_id, topic, k=5),
+        "anchors": related_dicts(db, student_id or get_local_student_id(db), topic, k=5),
     }
 
 

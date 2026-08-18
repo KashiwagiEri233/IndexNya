@@ -29,7 +29,6 @@ function statusBadge(r: PracticeRecord) {
 }
 
 export default function PracticePage() {
-  const student = useAppStore((s) => s.student);
   const practiceVersion = useAppStore((s) => s.practiceVersion);
   const bumpPractice = useAppStore((s) => s.bumpPractice);
   const setPendingPracticeMessage = useAppStore((s) => s.setPendingPracticeMessage);
@@ -37,15 +36,13 @@ export default function PracticePage() {
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const { data: records, isLoading } = useQuery({
-    queryKey: ["practice", student?.id, practiceVersion, filter],
-    queryFn: () => (student ? api.listPractice(student.id, filter) : []),
-    enabled: !!student,
+    queryKey: ["practice", practiceVersion, filter],
+    queryFn: () => api.listPractice(filter),
   });
 
   const all = useQuery({
-    queryKey: ["practice-all", student?.id, practiceVersion],
-    queryFn: () => (student ? api.listPractice(student.id, "all") : []),
-    enabled: !!student,
+    queryKey: ["practice-all", practiceVersion],
+    queryFn: () => api.listPractice("all"),
   });
   const wrongCount = (all.data ?? []).filter((r) => r.is_correct === false).length;
 
@@ -60,10 +57,9 @@ export default function PracticePage() {
   }
 
   async function clearAll() {
-    if (!student) return;
     if (!window.confirm("确定清空全部错题记录吗？删除后无法恢复。")) return;
     try {
-      await api.clearPractice(student.id);
+      await api.clearPractice();
       bumpPractice();
     } catch (error: any) {
       alert(`清空失败：${error.message}`);
@@ -72,7 +68,7 @@ export default function PracticePage() {
 
   /** 把答错的题目拼成一条消息，带回对话页重新刷一遍。 */
   function repracticeWrong() {
-    if (!student || wrongCount === 0) return;
+    if (wrongCount === 0) return;
     const wrong = (all.data ?? []).filter((r) => r.is_correct === false);
     const text =
       "重新练习这些错题：\n" +

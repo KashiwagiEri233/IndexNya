@@ -1,8 +1,7 @@
-/** 全局状态 — 当前学生 / 当前对话 / 资源刷新信号 / 探索卡片坞。 */
+/** 全局状态 — 当前对话 / 模型 / 探索卡片坞（本地单用户）。 */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatModel, ChatTerm, ExploreMode, Student } from "@/lib/api";
-import { api } from "@/lib/api";
+import type { ChatModel, ChatTerm, ExploreMode } from "@/lib/api";
 
 /** 一张打开的探索卡片（层级对话）。 */
 export interface ExploreCardState {
@@ -26,10 +25,6 @@ export interface ExploreCardState {
 }
 
 interface AppState {
-  student: Student | null;
-  setStudent: (s: Student | null) => void;
-  ensureStudent: () => Promise<Student>;
-
   // 当前对话 id，持久化到 localStorage，刷新不丢
   convId: number | null;
   setConvId: (id: number | null) => void;
@@ -41,7 +36,7 @@ interface AppState {
   removeModel: (id: string) => void;
   setSelectedModelId: (id: string) => void;
 
-  // 触发路径/画像/错题本刷新的计数器
+  // 触发对话/卡片/文献/宇宙/错题本刷新的计数器
   conversationVersion: number;
   bumpConversations: () => void;
   cardVersion: number;
@@ -76,21 +71,6 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      student: null,
-      setStudent: (s) => set({ student: s }),
-      ensureStudent: async () => {
-        const cur = get().student;
-        if (cur) return cur;
-        const list = await api.listStudents();
-        if (list.length > 0) {
-          set({ student: list[0] });
-          return list[0];
-        }
-        const s = await api.createStudent("新用户");
-        set({ student: s });
-        return s;
-      },
-
       convId: null,
       setConvId: (id) => set({ convId: id }),
 

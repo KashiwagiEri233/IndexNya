@@ -17,11 +17,13 @@ async def generate(
     payload: ResourceGenerateRequest,
     db: Session = Depends(get_db),
 ) -> ResourceOut:
+    from ..services.student_service import get_local_student_id
+
     token = set_active_model(payload.model.model_dump(exclude_none=True) if payload.model else None)
     try:
         r = await generate_resource(
             db,
-            payload.student_id,
+            payload.student_id or get_local_student_id(db),
             payload.type,
             payload.topic,
             conversation_id=payload.conversation_id,
@@ -35,8 +37,10 @@ async def generate(
 
 
 @router.get("", response_model=list[ResourceOut])
-def list_(student_id: int, type: str | None = None, db: Session = Depends(get_db)) -> list[ResourceOut]:
-    items = list_resources(db, student_id, resource_type=type)
+def list_(student_id: int | None = None, type: str | None = None, db: Session = Depends(get_db)) -> list[ResourceOut]:
+    from ..services.student_service import get_local_student_id
+
+    items = list_resources(db, student_id or get_local_student_id(db), resource_type=type)
     return [ResourceOut.model_validate(r) for r in items]
 
 

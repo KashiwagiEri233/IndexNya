@@ -18,7 +18,6 @@ interface Verdict {
 const PALETTE = ["#68aaa7", "#ee9782", "#8f9fd8", "#e3c567", "#7fb3d5", "#c98fd8", "#7ec8a5"];
 
 export default function UniversePage() {
-  const student = useAppStore((s) => s.student);
   const universeVersion = useAppStore((s) => s.universeVersion);
   const bumpUniverse = useAppStore((s) => s.bumpUniverse);
   const pendingInsight = useAppStore((s) => s.pendingInsight);
@@ -44,15 +43,13 @@ export default function UniversePage() {
   }, [pendingInsight, setPendingInsight]);
 
   const { data: understandings } = useQuery({
-    queryKey: ["universe", student?.id, universeVersion],
-    queryFn: () => (student ? api.getUniverse(student.id) : []),
-    enabled: !!student,
+    queryKey: ["universe", universeVersion],
+    queryFn: () => api.getUniverse(),
   });
 
   const { data: graph } = useQuery({
-    queryKey: ["universe-graph", student?.id, universeVersion],
-    queryFn: () => (student ? api.getUniverseGraph(student.id) : { nodes: [], links: [] } as UniverseGraph),
-    enabled: !!student,
+    queryKey: ["universe-graph", universeVersion],
+    queryFn: () => api.getUniverseGraph(),
   });
 
   useEffect(() => {
@@ -67,7 +64,6 @@ export default function UniversePage() {
   }, []);
 
   async function submit() {
-    if (!student) return;
     const c = concept.trim();
     const s = summary.trim();
     if (!c || !s) {
@@ -77,7 +73,7 @@ export default function UniversePage() {
     setSubmitting(true);
     setVerdict(null);
     try {
-      const result = await api.evaluateUnderstanding({ student_id: student.id, concept: c, summary: s });
+      const result = await api.evaluateUnderstanding({ concept: c, summary: s });
       setVerdict({
         approved: result.approved,
         score: result.score,
@@ -97,10 +93,10 @@ export default function UniversePage() {
   }
 
   async function probeAnchors() {
-    if (!student || !anchorTopic.trim()) return;
+    if (!anchorTopic.trim()) return;
     setAnchorLoading(true);
     try {
-      const result = await api.getAnchors(student.id, anchorTopic.trim());
+      const result = await api.getAnchors(anchorTopic.trim());
       setAnchors(result.anchors);
     } catch (e: any) {
       alert(`锚点探测失败：${e.message}`);

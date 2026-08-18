@@ -15,7 +15,7 @@ MAX_SIZE = 4 * 1024 * 1024  # 4MB（多模态模型输入限制）
 
 @router.post("/understand")
 async def understand(
-    student_id: int = Form(...),
+    student_id: int | None = Form(None),
     question: str = Form("请描述这张图片的内容"),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),

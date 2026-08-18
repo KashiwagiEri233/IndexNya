@@ -19,19 +19,18 @@ class MainAgent:
     """
 
     # 轻量意图判定 — 只输出一个小 JSON，不产出 tasks/acceptance 等大结构。
+    # 技能不再由这里路由：技能目录已注入对话 Agent 的系统提示词，由 Agent 自己决定触发
+    # （用户点名或任务匹配技能描述时由 Agent 直接触发）。
     ROUTE_LIGHT_PROMPT = """你是意图分类器，只判断用户请求应交给哪个功能，绝不回答问题本身。
 只输出一个 JSON 对象，不要解释、不要 Markdown、不要代码块：
-{"action": "chat|tutor|resource|skill|quiz_session", "resource_type": "lecture|mindmap|quiz|reading|code|null", "skill": "技能名|null", "topic": "简短主题"}
+{"action": "chat|tutor|resource|quiz_session", "resource_type": "lecture|mindmap|quiz|reading|code|null", "topic": "简短主题"}
 
 规则：
 - 用户明确要生成学习资料（讲解文档/思维导图/练习题/拓展阅读/代码案例）时 action=resource，resource_type 填对应类型。
 - 用户想互动刷题、一题一题被提问着做题（如"刷题""陪我练题""逐题练习"）时 action=quiz_session。
-- 用户请求与下列可用技能匹配时 action=skill，skill 必须填列表中的确切 name。
 - 用户提出具体疑问、求讲解、求解答时 action=tutor。
 - 其余（闲聊、宽泛咨询、不确定）action=chat。
 
-可用技能：
-{skill_catalog}
 topic 用 2-10 字概括。"""
 
     @staticmethod
@@ -49,28 +48,20 @@ topic 用 2-10 字概括。"""
     async def route_light(
         self,
         message: str,
-        profile: dict | None = None,
         history: list[dict] | None = None,
     ) -> dict[str, Any]:
         """阶段A-3：轻量意图判定（仅当 keywords 未命中时调用）。
 
-        返回：{"action", "resource_type", "skill", "topic"}
+        返回：{"action", "resource_type", "topic"}
+        技能由对话 Agent 依据系统提示词中的技能目录自行触发，不在此路由。
         """
-        from ..skills.manager import get_skill, list_skills
-
-        skills = list_skills()
-        catalog = "\n".join(
-            f"- {s.name}：{s.title} — {s.description[:40]}" for s in skills
-        ) if skills else "- （暂无技能）"
-        system_prompt = self.ROUTE_LIGHT_PROMPT.format(skill_catalog=catalog)
-
         recent = "\n".join(
             f"{item.get('role')}: {str(item.get('content', ''))[:200]}" for item in (history or [])[-4:]
         )
-        user_content = f"学生画像：{profile or {}}\n最近对话：{recent}\n当前请求：{message}"
+        user_content = f"最近对话：{recent}\n当前请求：{message}"
         try:
             text = await chat_complete(
-                [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}],
+                [{"role": "system", "content": self.ROUTE_LIGHT_PROMPT}, {"role": "user", "content": user_content}],
                 temperature=0.0,
                 max_tokens=150,
             )
@@ -80,7 +71,7 @@ topic 用 2-10 字概括。"""
             data = {}
 
         action = str(data.get("action", "chat")).lower()
-        if action not in {"chat", "tutor", "resource", "skill", "quiz_session"}:
+        if action not in {"chat", "tutor", "resource", "quiz_session"}:
             action = "chat"
 
         resource_type = str(data.get("resource_type", "")).lower()
@@ -88,16 +79,10 @@ topic 用 2-10 字概括。"""
             action = "chat"
             resource_type = ""
 
-        skill = str(data.get("skill") or "").strip()
-        if action == "skill" and get_skill(skill) is None:
-            action = "chat"
-            skill = ""
-
         topic = str(data.get("topic") or "").strip() or message[:20]
         return {
             "action": action,
             "resource_type": resource_type or None,
-            "skill": skill or None,
             "topic": topic,
         }
 
@@ -106,20 +91,60 @@ topic 用 2-10 字概括。"""
 请用中文、结构清晰地回答用户问题；必要时使用 Markdown、数学公式和例子。
 不要提及 Agent、路由或内部工作流程。"""
 
+    @staticmethod
+    def build_skills_prompt() -> str:
+        """构建技能提示段（渐进式披露：只给名称+描述，不注入正文）。
+
+        技能目录随系统提示词常驻，由对话 Agent 自行判断何时触发
+        （用户点名或任务匹配描述）；完整指令在执行时通过 use_skill
+        工具按需加载。无已开启技能时返回空字符串。
+        """
+        from ..skills.manager import list_skills
+
+        skills = [s for s in list_skills() if s.enabled]
+        if not skills:
+            return ""
+
+        inventory_lines = [
+            f"- **{s.name}**：{s.description or '无描述'}\n  文件：`backend/app/skills/{s.name}/SKILL.md`"
+            for s in skills
+        ]
+        return (
+            "## 可用技能\n\n"
+            "你拥有若干专用技能——以 SKILL.md 指令文件存储的可复用执行手册。"
+            "每个技能有名称和描述，说明它做什么、何时使用。\n\n"
+            "### 技能清单\n\n"
+            + "\n".join(inventory_lines)
+            + "\n\n### 技能规则\n\n"
+            "1. **发现** — 上面的清单是本次会话的完整技能目录，完整指令在对应的 SKILL.md 中。\n"
+            "2. **触发时机** — 当用户明确说出技能名，或请求明显匹配某技能的描述时，就应该使用该技能；"
+            "不要静默跳过匹配的技能——要么使用它，要么简短说明为什么不用。\n"
+            "3. **先加载再执行** — 执行任何技能前，必须先调用 use_skill 工具加载它的完整指令"
+            "（这是读取 SKILL.md 的方式），不要凭记忆或猜测执行。\n"
+            "4. **渐进式加载** — 只加载当前任务直接需要的技能，不要一次性把全部技能都用上。\n"
+            "5. **协同** — 多个技能同时适用时，选择最小必要集合，并用一句话说明正在使用哪个技能及原因。\n"
+            "6. **失败处理** — 技能无法应用时，清楚说明问题并继续用最佳替代方案回答。"
+        )
+
     async def stream_answer(
         self,
         message: str,
         history: list[dict] | None = None,
         extra_context: str = "",
+        tools: list[dict] | None = None,
+        on_tool_calls: Any | None = None,
     ):
         """普通对话由主 Agent 直接流式回答，不创建 conversation subagent。"""
         messages: list[dict[str, Any]] = [{"role": "system", "content": self.CONVERSATION_PROMPT}]
+        skills_section = self.build_skills_prompt()
+        if skills_section:
+            messages.append({"role": "system", "content": skills_section})
         if extra_context:
             messages.append({"role": "system", "content": extra_context})
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": message})
-        async for chunk in chat_stream(messages, temperature=0.7, max_tokens=3072):
+        async for chunk in chat_stream(messages, temperature=0.7, max_tokens=3072, tools=tools, on_tool_calls=on_tool_calls):
             yield chunk
 
     async def accept(self, plan: dict[str, Any], result: str) -> dict[str, Any]:

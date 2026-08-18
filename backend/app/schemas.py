@@ -7,20 +7,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
-# ===== 学生 =====
-class StudentCreate(BaseModel):
-    name: str = "同学"
-
-
-class StudentOut(BaseModel):
-    id: int
-    name: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # ===== 对话 =====
 class ChatModelConfig(BaseModel):
     """前端可选的 OpenAI 兼容模型配置。密钥仅用于当前请求，不写入数据库。"""
@@ -40,13 +26,11 @@ class ChatRequest(BaseModel):
     """流式对话请求。
 
     resource_type: 若提供，则本次对话路由到指定资源生成 agent
-    skill: 若提供，则本次对话显式使用该技能（技能名见 GET /api/skills）
     """
     conversation_id: Optional[int] = None
     student_id: Optional[int] = None
     message: str
     resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code
-    skill: Optional[str] = None
     mode: str = "chat"  # chat / resource / tutor / quiz_session
     model: Optional[ChatModelConfig] = None
     context: Optional[str] = None
@@ -77,7 +61,7 @@ class ConversationOut(BaseModel):
 
 # ===== 资源 =====
 class ResourceGenerateRequest(BaseModel):
-    student_id: int
+    student_id: Optional[int] = None  # 本地单用户：缺省使用本地学生
     conversation_id: Optional[int] = None
     type: str  # lecture/mindmap/quiz/reading/code
     topic: str
@@ -101,7 +85,6 @@ class ResourceOut(BaseModel):
 
 # ===== 智能辅导 =====
 class TutorAskRequest(BaseModel):
-    student_id: int
     question: str
     context_resource_id: Optional[int] = None
     modality: str = "text"  # text / video（推荐相关视频）
@@ -121,7 +104,7 @@ class ExploreRequest(BaseModel):
     mode: child(深挖背景) / related(横向对比) / branch(继承上下文的分支对话)
     card_id: 重开已有卡片时传入，复用该行而非新建
     """
-    student_id: int
+    student_id: Optional[int] = None  # 本地单用户：缺省使用本地学生
     term: str
     explanation: Optional[str] = None
     context: str = ""
@@ -180,7 +163,6 @@ class LiteratureDetailOut(LiteratureOut):
 
 # ===== 思维宇宙 =====
 class EvaluateRequest(BaseModel):
-    student_id: int
     concept: str = Field(min_length=1, max_length=128)
     summary: str = Field(min_length=1, max_length=20000)
     model: Optional[ChatModelConfig] = None

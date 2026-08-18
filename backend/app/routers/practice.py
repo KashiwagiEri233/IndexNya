@@ -28,12 +28,15 @@ def _to_dict(r: PracticeRecord) -> dict:
 
 @router.get("")
 def list_records(
-    student_id: int,
+    student_id: int | None = None,
     filter: str = Query("all", pattern="^(all|wrong|right|pending)$"),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     """错题本列表。filter: all / wrong（答错）/ right（答对）/ pending（未作答）。"""
-    q = db.query(PracticeRecord).filter(PracticeRecord.student_id == student_id)
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
+    q = db.query(PracticeRecord).filter(PracticeRecord.student_id == sid)
     if filter == "pending":
         q = q.filter(PracticeRecord.is_correct.is_(None))
     elif filter in ("wrong", "right"):
@@ -53,11 +56,14 @@ def delete_record(record_id: int, db: Session = Depends(get_db)) -> dict:
 
 
 @router.delete("")
-def clear_records(student_id: int, db: Session = Depends(get_db)) -> dict:
-    """清空该学生的全部错题记录。"""
+def clear_records(student_id: int | None = None, db: Session = Depends(get_db)) -> dict:
+    """清空全部错题记录。"""
+    from ..services.student_service import get_local_student_id
+
+    sid = student_id or get_local_student_id(db)
     count = (
         db.query(PracticeRecord)
-        .filter(PracticeRecord.student_id == student_id)
+        .filter(PracticeRecord.student_id == sid)
         .delete(synchronize_session=False)
     )
     db.commit()

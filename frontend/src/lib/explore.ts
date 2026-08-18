@@ -58,10 +58,6 @@ function updateLastAssistant(key: string, update: (m: ExploreCardState["messages
 /** 打开一张探索卡片（提问编辑态，不请求 LLM）。 */
 export function openExploreCard(opts: OpenExploreOptions): string | null {
   const state = useAppStore.getState();
-  if (!state.student) {
-    alert("学生信息尚未加载，请稍后重试。");
-    return null;
-  }
   const key = crypto.randomUUID();
   const mode = opts.mode ?? "child";
   state.exploreAdd({
@@ -89,10 +85,6 @@ export function openExploreCard(opts: OpenExploreOptions): string | null {
  */
 export async function restoreExploreCard(row: CardRow): Promise<string | null> {
   const state = useAppStore.getState();
-  if (!state.student) {
-    alert("学生信息尚未加载，请稍后重试。");
-    return null;
-  }
   const key = crypto.randomUUID();
   const saved = row.content?.messages ?? [];
   let messages: { role: "user" | "assistant"; content: string; streaming?: boolean; terms?: ChatTerm[] }[] = saved.map((m) => ({
@@ -140,8 +132,7 @@ export async function restoreExploreCard(row: CardRow): Promise<string | null> {
 export async function startExploreCard(key: string, question: string): Promise<void> {
   const state = useAppStore.getState();
   const card = state.exploreCards.find((c) => c.key === key);
-  const student = state.student;
-  if (!card || !student) return;
+  if (!card) return;
   const model = resolveModel(card.modelId);
   if (!model) {
     alert("请先添加并选择一个对话模型，再发送。");
@@ -150,7 +141,6 @@ export async function startExploreCard(key: string, question: string): Promise<v
   patchCard(key, { status: "opening", error: undefined });
 
   const payload: ExploreCardPayload = {
-    student_id: student.id,
     term: card.term,
     explanation: card.explanation,
     context: card.context,
@@ -226,8 +216,7 @@ export function switchExploreMode(key: string, mode: ExploreMode) {
 export async function sendBranchMessage(key: string, text: string) {
   const state = useAppStore.getState();
   const card = state.exploreCards.find((c) => c.key === key);
-  const student = state.student;
-  if (!card || !card.branchConversationId || !student) return;
+  if (!card || !card.branchConversationId) return;
   const model = resolveModel(card.modelId);
   if (!model) {
     alert("请先添加并选择一个对话模型。");
@@ -244,7 +233,6 @@ export async function sendBranchMessage(key: string, text: string) {
     await api.chatStream(
       {
         conversation_id: card.branchConversationId,
-        student_id: student.id,
         message: text,
         model: toModelPayload(model),
         context: `当前分支聚焦术语：${card.term}`,

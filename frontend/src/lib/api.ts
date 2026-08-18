@@ -1,12 +1,6 @@
-/** 后端 API 客户端 — 普通 fetch + SSE 流式封装。 */
+/** 后端 API 客户端 — 普通 fetch + SSE 流式封装（本地单用户，无需 student_id）。 */
 
 export const API_BASE = "/api";
-
-export interface Student {
-  id: number;
-  name: string;
-  created_at: string;
-}
 
 export interface Message {
   id: number;
@@ -55,6 +49,7 @@ export interface Skill {
   name: string;
   title: string;
   description: string;
+  enabled: boolean;
 }
 
 export interface PracticeRecord {
@@ -95,7 +90,6 @@ export interface CardRow {
 export type ModelPayload = { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: string };
 
 export interface ExploreCardPayload {
-  student_id: number;
   term: string;
   explanation?: string;
   context?: string;
@@ -160,23 +154,9 @@ export const api = {
     );
   },
 
-  async createStudent(name = "新用户") {
-    return j<Student>(
-      await fetch(`${API_BASE}/students`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      })
-    );
-  },
-
-  async listStudents() {
-    return j<Student[]>(await fetch(`${API_BASE}/students`));
-  },
-
-  async getConversations(studentId: number) {
+  async getConversations() {
     return j<Conversation[]>(
-      await fetch(`${API_BASE}/conversations?student_id=${studentId}`)
+      await fetch(`${API_BASE}/conversations`)
     );
   },
 
@@ -212,8 +192,8 @@ export const api = {
     );
   },
 
-  async listPractice(studentId: number, filter: "all" | "wrong" | "right" | "pending" = "all") {
-    return j<PracticeRecord[]>(await fetch(`${API_BASE}/practice?student_id=${studentId}&filter=${filter}`));
+  async listPractice(filter: "all" | "wrong" | "right" | "pending" = "all") {
+    return j<PracticeRecord[]>(await fetch(`${API_BASE}/practice?filter=${filter}`));
   },
 
   async deletePractice(recordId: number) {
@@ -222,14 +202,13 @@ export const api = {
     );
   },
 
-  async clearPractice(studentId: number) {
+  async clearPractice() {
     return j<{ deleted_count: number }>(
-      await fetch(`${API_BASE}/practice?student_id=${studentId}`, { method: "DELETE" })
+      await fetch(`${API_BASE}/practice`, { method: "DELETE" })
     );
   },
 
   async generateResource(payload: {
-    student_id: number;
     type: string;
     topic: string;
     conversation_id?: number;
@@ -246,7 +225,6 @@ export const api = {
   },
 
   async tutorAsk(payload: {
-    student_id: number;
     question: string;
     context_resource_id?: number;
     modality?: string;
@@ -261,7 +239,6 @@ export const api = {
   },
 
   async understandImage(
-    studentId: number,
     image: File,
     question: string,
   ): Promise<{
@@ -272,7 +249,6 @@ export const api = {
     error: string | null;
   }> {
     const form = new FormData();
-    form.append("student_id", String(studentId));
     form.append("question", question);
     form.append("image", image);
     const resp = await fetch(`${API_BASE}/image/understand`, {
@@ -290,14 +266,37 @@ export const api = {
     return j<Skill[]>(await fetch(`${API_BASE}/skills`));
   },
 
+  /** 上传 .zip 技能包安装（zip 内可直接放 SKILL.md，或放一个/多个技能文件夹）。 */
+  async installSkill(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    return j<{ names: string[]; message: string }>(
+      await fetch(`${API_BASE}/skills`, { method: "POST", body: fd })
+    );
+  },
+
+  async deleteSkill(name: string) {
+    return j<{ name: string; status: string }>(
+      await fetch(`${API_BASE}/skills/${name}`, { method: "DELETE" })
+    );
+  },
+
+  async setSkillEnabled(name: string, enabled: boolean) {
+    return j<{ name: string; enabled: boolean }>(
+      await fetch(`${API_BASE}/skills/${name}/enabled`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      })
+    );
+  },
+
   /** SSE 流式对话。回调接收事件。 */
   async chatStream(
     payload: {
       conversation_id?: number;
-      student_id?: number;
       message: string;
       resource_type?: string;
-      skill?: string;
       mode?: string;
       model?: { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: "chat" | "image" };
       context?: string;
@@ -463,8 +462,8 @@ export const api = {
   },
 
   // ===== 探索卡片（卡片树） =====
-  async listCards(studentId: number) {
-    return j<CardRow[]>(await fetch(`${API_BASE}/hierarchy/cards?student_id=${studentId}`));
+  async listCards() {
+    return j<CardRow[]>(await fetch(`${API_BASE}/hierarchy/cards`));
   },
 
   async deleteCard(cardId: number) {
@@ -491,9 +490,8 @@ export const api = {
   },
 
   // ===== 文献导入 =====
-  async uploadLiterature(studentId: number, file: File) {
+  async uploadLiterature(file: File) {
     const form = new FormData();
-    form.append("student_id", String(studentId));
     form.append("file", file);
     const resp = await fetch(`${API_BASE}/literature/upload`, { method: "POST", body: form });
     if (!resp.ok) {
@@ -513,8 +511,8 @@ export const api = {
     );
   },
 
-  async listLiteratures(studentId: number) {
-    return j<Literature[]>(await fetch(`${API_BASE}/literature?student_id=${studentId}`));
+  async listLiteratures() {
+    return j<Literature[]>(await fetch(`${API_BASE}/literature`));
   },
 
   async getLiterature(literatureId: number) {
@@ -529,7 +527,6 @@ export const api = {
 
   // ===== 思维宇宙 =====
   async evaluateUnderstanding(payload: {
-    student_id: number;
     concept: string;
     summary: string;
     model?: ModelPayload;
@@ -549,17 +546,17 @@ export const api = {
     );
   },
 
-  async getUniverse(studentId: number) {
-    return j<Understanding[]>(await fetch(`${API_BASE}/universe/${studentId}`));
+  async getUniverse() {
+    return j<Understanding[]>(await fetch(`${API_BASE}/universe`));
   },
 
-  async getUniverseGraph(studentId: number) {
-    return j<UniverseGraph>(await fetch(`${API_BASE}/universe/${studentId}/graph`));
+  async getUniverseGraph() {
+    return j<UniverseGraph>(await fetch(`${API_BASE}/universe/graph`));
   },
 
-  async getAnchors(studentId: number, topic: string) {
+  async getAnchors(topic: string) {
     return j<{ topic: string; anchors: AnchorItem[] }>(
-      await fetch(`${API_BASE}/universe/${studentId}/anchors?topic=${encodeURIComponent(topic)}`)
+      await fetch(`${API_BASE}/universe/anchors?topic=${encodeURIComponent(topic)}`)
     );
   },
 
