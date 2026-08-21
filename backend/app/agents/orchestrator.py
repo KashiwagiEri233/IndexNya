@@ -11,7 +11,6 @@ from .coder import CoderAgent
 from .image_reader import ImageReaderAgent
 from .lecturer import LecturerAgent
 from .mindmap import MindmapAgent
-from .quizmaster import QuizmasterAgent
 from .reader import ReaderAgent
 from .tutor import TutorAgent
 
@@ -19,7 +18,6 @@ from .tutor import TutorAgent
 AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
     "lecture": LecturerAgent,
     "mindmap": MindmapAgent,
-    "quiz": QuizmasterAgent,
     "reading": ReaderAgent,
     "code": CoderAgent,
     "image_reader": ImageReaderAgent,
@@ -30,7 +28,6 @@ AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
 RESOURCE_AGENT_MAP: dict[str, str] = {
     "lecture": "lecture",
     "mindmap": "mindmap",
-    "quiz": "quiz",
     "reading": "reading",
     "code": "code",
 }

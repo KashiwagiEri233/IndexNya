@@ -23,11 +23,11 @@ class MainAgent:
     # （用户点名或任务匹配技能描述时由 Agent 直接触发）。
     ROUTE_LIGHT_PROMPT = """你是意图分类器，只判断用户请求应交给哪个功能，绝不回答问题本身。
 只输出一个 JSON 对象，不要解释、不要 Markdown、不要代码块：
-{"action": "chat|tutor|resource|quiz_session", "resource_type": "lecture|mindmap|quiz|reading|code|null", "topic": "简短主题"}
+{"action": "chat|tutor|resource|quiz_session", "resource_type": "lecture|mindmap|reading|code|null", "topic": "简短主题"}
 
 规则：
-- 用户明确要生成学习资料（讲解文档/思维导图/练习题/拓展阅读/代码案例）时 action=resource，resource_type 填对应类型。
-- 用户想互动刷题、一题一题被提问着做题（如"刷题""陪我练题""逐题练习"）时 action=quiz_session。
+- 用户明确要生成学习资料（讲解文档/思维导图/拓展阅读/代码案例）时 action=resource，resource_type 填对应类型。
+- 用户想做练习题、测试题、出题或互动刷题（如"做题""练习题""测试""刷题""考考我""逐题练习"）时 action=quiz_session。
 - 用户提出具体疑问、求讲解、求解答时 action=tutor。
 - 其余（闲聊、宽泛咨询、不确定）action=chat。
 
@@ -75,7 +75,7 @@ topic 用 2-10 字概括。"""
             action = "chat"
 
         resource_type = str(data.get("resource_type", "")).lower()
-        if action == "resource" and resource_type not in ("lecture", "mindmap", "quiz", "reading", "code"):
+        if action == "resource" and resource_type not in ("lecture", "mindmap", "reading", "code"):
             action = "chat"
             resource_type = ""
 

@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from ..agents.coder import CoderAgent
 from ..agents.lecturer import LecturerAgent
 from ..agents.mindmap import MindmapAgent
-from ..agents.quizmaster import QuizmasterAgent
 from ..agents.reader import ReaderAgent
 from ..models import Resource
 
@@ -19,7 +18,6 @@ logger = logging.getLogger(__name__)
 _GENERATORS = {
     "lecture": ("讲解文档", LecturerAgent),
     "mindmap": ("思维导图", MindmapAgent),
-    "quiz": ("练习题库", QuizmasterAgent),
     "reading": ("拓展阅读", ReaderAgent),
     "code": ("代码实操", CoderAgent),
 }
@@ -87,8 +85,6 @@ async def generate_resource(
             text = await agent_cls().generate(topic, profile, extra=extra_str)
             content = {"markdown": text}
         elif resource_type == "mindmap":
-            content = await agent_cls().generate(topic, profile, extra=extra_str)
-        elif resource_type == "quiz":
             content = await agent_cls().generate(topic, profile, extra=extra_str)
         elif resource_type == "reading":
             text = await agent_cls().generate(topic, profile, extra=extra_str)

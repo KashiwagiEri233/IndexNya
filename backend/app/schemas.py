@@ -31,7 +31,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[int] = None
     student_id: Optional[int] = None
     message: str
-    resource_type: Optional[str] = None  # lecture/mindmap/quiz/reading/code
+    resource_type: Optional[str] = None  # lecture/mindmap/reading/code
     mode: str = "chat"  # chat / resource / tutor / quiz_session
     model: Optional[ChatModelConfig] = None
     context: Optional[str] = None
@@ -64,7 +64,7 @@ class ConversationOut(BaseModel):
 class ResourceGenerateRequest(BaseModel):
     student_id: Optional[int] = None  # 本地单用户：缺省使用本地学生
     conversation_id: Optional[int] = None
-    type: str  # lecture/mindmap/quiz/reading/code
+    type: str  # lecture/mindmap/reading/code
     topic: str
     extra: dict[str, Any] = Field(default_factory=dict)
     model: Optional[ChatModelConfig] = None

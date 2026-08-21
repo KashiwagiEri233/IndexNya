@@ -34,6 +34,7 @@ from ..services.quiz_service import (
     close_session,
     find_ask_question,
     is_quiz_exit,
+    try_extract_question_from_text,
     new_session,
     serialize as serialize_quiz_session,
 )
@@ -68,12 +69,11 @@ _KEYWORD_ROUTES: list[tuple[re.Pattern, str, str | None]] = [
     (re.compile(r"(?:重新|重练|重做|把|用).{0,8}(?:错题|这些题)"), "quiz_session", None),
     (re.compile(r"(?:生成|制作|做份?|创建|写|出|给我|帮我|整理|梳理).{0,8}(?:讲解(?:文档|讲义)|讲义|教学文档|讲解资料|课件)"), "resource", "lecture"),
     (re.compile(r"(?:生成|画|做份?|给我|帮我|整理|梳理|列).{0,8}(?:思维导图|脑图|知识(?:结构|框架|树))"), "resource", "mindmap"),
-    (re.compile(r"(?:生成|出|做份?|给我|帮我|编).{0,8}(?:题目|练习题|习题|测试题|试卷|考卷)"), "resource", "quiz"),
     (re.compile(r"(?:生成|推荐|给我|帮我|找|整理).{0,8}(?:拓展阅读|阅读材料|参考文献?|书单|参考书|学习资料)"), "resource", "reading"),
     (re.compile(r"(?:推荐|给我|帮我|找).{0,12}书(?=[单籍本]?\s*$|[，。！？])"), "resource", "reading"),
     (re.compile(r"(?:生成|写|实现|做份?|给我|帮我).{0,8}(?:代码(?:案例|示例)?|小程序|脚本|demo)"), "resource", "code"),
-    # 互动刷题：逐题提问练习（区别于一次性生成题库）
-    (re.compile(r"(?:刷题|逐题|一题一题|互动练习|来几道题|出题考(?:考|我)|考考我|陪我练|练(?:习|一练).{0,6}(?:题|练))"), "quiz_session", None),
+    # 互动刷题（统一替换原静态练习题库）：做题/出题/练习/测试/刷题统一走互动刷题
+    (re.compile(r"(?:生成|出|做份?|给我|帮我|编|刷|做|考|练习).{0,8}(?:题目|练习题|习题|测试题|试卷|考卷)|(?:刷题|逐题|一题一题|互动练习|来几道题|出题考(?:考|我)|考考我|陪我练|练(?:习|一练).{0,6}(?:题|练))"), "quiz_session", None),
 ]
 
 
@@ -254,7 +254,7 @@ def _friendly_model_test_error(error: Exception) -> str:
 def _format_resource_preview(r) -> str:
     """把生成的资源格式化为对话流中的预览 Markdown。"""
     type_label = {
-        "lecture": "讲解文档", "mindmap": "思维导图", "quiz": "练习题库",
+        "lecture": "讲解文档", "mindmap": "思维导图",
         "reading": "拓展阅读", "code": "代码实操",
     }.get(r.type, r.type)
     header = f"✅ 已生成 **{type_label}**：{r.title}\n\n"
@@ -332,6 +332,8 @@ async def _stream_chat_impl(
     elif explicit:
         if explicit == "video":
             route = {"action": "tutor", "topic": payload.message, "video_topic": payload.message}
+        elif explicit == "quiz":
+            route = {"action": "quiz_session", "topic": payload.message}
         else:
             route = {"action": "resource", "resource_type": explicit, "topic": payload.message}
         main_plan = _template_main_plan(route, payload.message)
@@ -467,10 +469,14 @@ async def _stream_chat_impl(
                 messages,
                 tools=tools,
                 temperature=0.5,
-                max_tokens=1200,
+                max_tokens=4096,
             )
             text_out = (content or "").strip()
-            answer_question: dict[str, Any] | None = find_ask_question(tool_calls)
+            answer_question: dict[str, Any] | None = find_ask_question(tool_calls) if not exiting else None
+
+            # 容错：若未通过 tool call 捕获到题目但正文中包含新题，从正文中提取
+            if not exiting and answer_question is None:
+                answer_question = try_extract_question_from_text(text_out)
 
             if exiting or answer_question is None:
                 # 学生结束 / 模型不再出题 → 收尾（小结）

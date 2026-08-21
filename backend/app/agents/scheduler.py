@@ -81,6 +81,6 @@ async def _run_resource(task: AgentTask, context: AgentContext) -> AgentResult:
 def build_default_scheduler() -> AgentScheduler:
     scheduler = AgentScheduler()
     scheduler.register("tutor", _run_tutor)
-    for resource_type in ("lecture", "mindmap", "quiz", "reading", "code"):
+    for resource_type in ("lecture", "mindmap", "reading", "code"):
         scheduler.register(resource_type, _run_resource)
     return scheduler

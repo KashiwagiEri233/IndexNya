@@ -35,7 +35,6 @@ class RouterAgent:
 resource 时必须填 resource_type：
 - lecture：讲解文档（"讲解""讲义""详细讲""系统介绍"）
 - mindmap：思维导图（"思维导图""知识结构""梳理框架""脑图"）
-- quiz：练习题库（"题目""练习""做题""测试""考试题"）
 - reading：拓展阅读（"推荐书""文献""阅读材料""参考资料"）
 - code：代码实操（"代码""编程""实现""写程序""示例代码"）
 
@@ -47,7 +46,6 @@ topic 字段：资源/答疑的主题（简短，如"二叉树""快速排序"）
 用户：我数据结构比较弱，喜欢看视频学习 → {"action":"chat","topic":""}
 用户：帮我生成二叉树的讲解文档 → {"action":"resource","resource_type":"lecture","topic":"二叉树"}
 用户：画个数据结构思维导图 → {"action":"resource","resource_type":"mindmap","topic":"数据结构"}
-用户：我想做栈和队列的练习题 → {"action":"resource","resource_type":"quiz","topic":"栈和队列"}
 用户：什么是动态规划？ → {"action":"tutor","topic":"什么是动态规划"}
 用户：写段快速排序代码 → {"action":"resource","resource_type":"code","topic":"快速排序"}
 用户：讲排序算法的视频 → {"action":"tutor","topic":"排序算法"}
@@ -130,6 +128,6 @@ topic 字段：资源/答疑的主题（简短，如"二叉树""快速排序"）
                 result["action"] = "tutor"
                 result["video_topic"] = topic or original_message[:30]
             else:
-                valid = {"lecture", "mindmap", "quiz", "reading", "code"}
+                valid = {"lecture", "mindmap", "reading", "code"}
                 result["resource_type"] = rtype if rtype in valid else "lecture"
         return result

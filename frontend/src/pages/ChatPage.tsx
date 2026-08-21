@@ -32,15 +32,14 @@ interface ChatMsg {
 }
 
 const ROUTE_LABELS: Record<string, string> = {
-  lecture: "讲解文档", mindmap: "思维导图", quiz: "练习题库",
+  lecture: "讲解文档", mindmap: "思维导图",
   reading: "拓展阅读", code: "代码实操",
 };
 
-// 资源快捷入口（讲解/导图/题库/阅读/代码）；插图与 PPT 已移除
+// 资源快捷入口（讲解/导图/阅读/代码）
 const RESOURCE_ACTIONS = [
   { type: "lecture", label: "讲解文档", icon: FileText },
   { type: "mindmap", label: "思维导图", icon: MapIcon },
-  { type: "quiz", label: "练习题库", icon: ListChecks },
   { type: "reading", label: "拓展阅读", icon: BookOpen },
   { type: "code", label: "代码实操", icon: Code },
 ] as const;
@@ -49,7 +48,6 @@ const RESOURCE_ACTIONS = [
 const ALL_FEATURES = [
   { label: "讲解文档", icon: FileText },
   { label: "思维导图", icon: MapIcon },
-  { label: "练习题库", icon: ListChecks },
   { label: "互动刷题", icon: ClipboardCheck },
   { label: "拓展阅读", icon: BookOpen },
   { label: "代码实操", icon: Code },
@@ -978,7 +976,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 资源生成快捷栏 */}
+      {/* 快捷操作栏 */}
       <div className="border-t border-island-border bg-island-panel/40 px-4 py-2">
         <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-center gap-1.5">
           {RESOURCE_ACTIONS.map((a) => {
@@ -987,7 +985,7 @@ export default function ChatPage() {
               <button
                 key={a.type}
                 disabled={busy}
-                onClick={() => { setPendingResource(selected ? null : a.type); }}
+                onClick={() => { setPendingResource(selected ? null : a.type); setQuizMode(false); }}
                 className={
                   "inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-xs font-bold transition-all duration-200 ease-island disabled:opacity-50 " +
                   (selected
@@ -1001,7 +999,7 @@ export default function ChatPage() {
               </button>
             );
           })}
-          {/* 互动刷题入口：逐题作答（区别于一次性生成题库） */}
+          {/* 互动刷题入口：逐题出题与即时批改 */}
           <button
             type="button"
             disabled={busy}
@@ -1014,8 +1012,8 @@ export default function ChatPage() {
             }
             title={quizMode ? "已选择互动刷题，输入想练习的主题后发送" : "互动刷题：一题一题作答、即时批改"}
           >
-            <PenLine size={13} />
-            刷题练习
+            <ClipboardCheck size={13} />
+            互动刷题
           </button>
         </div>
       </div>
