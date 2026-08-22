@@ -33,7 +33,9 @@ from ..services.quiz_service import (
     apply_tool_args,
     close_session,
     find_ask_question,
+    grade_answer,
     is_quiz_exit,
+    summary_text,
     try_extract_question_from_text,
     new_session,
     serialize as serialize_quiz_session,
@@ -205,6 +207,25 @@ def _active_quiz_session(db: Session, conversation_id: int) -> dict | None:
     return None
 
 
+async def _quiz_llm_call(messages: list[dict], tools: list | None) -> tuple[str, list[dict], bool]:
+    """调用模型出题/批改：优先强制调用 ask_question 工具。
+
+    作答轮若不强制 tool_choice，部分模型会只写文字点评而不调用工具，
+    导致刷题被误判为「不再出题」而提前结束。这里优先传 tool_choice="required"；
+    个别 OpenAI 兼容接口不支持该参数时会抛异常，降级为不强制重试一次。
+
+    返回 (content, tool_calls, forced)；forced=False 表示发生过降级（未强制）。
+    """
+    kwargs: dict[str, Any] = dict(messages=messages, tools=tools, temperature=0.5, max_tokens=4096)
+    try:
+        content, tool_calls = await chat_complete_message(**kwargs, tool_choice="required" if tools else None)
+        return content, tool_calls, True
+    except Exception as e:
+        logger.warning("quiz tool_choice=required unsupported (%s), retry without forcing", e)
+        content, tool_calls = await chat_complete_message(**kwargs)
+        return content, tool_calls, False
+
+
 def _record_practice_question(db: Session, student_id: int, conversation_id: int, session: dict, args: dict) -> None:
     """把新出的题插入错题本（pending 状态，作答后回填对错）。"""
     try:
@@ -223,15 +244,25 @@ def _record_practice_question(db: Session, student_id: int, conversation_id: int
         logger.warning("practice record insert failed: %s", e)
 
 
-def _mark_last_practice_answered(db: Session, conversation_id: int, is_correct: bool) -> None:
-    """把该会话最近一条未作答的错题本记录回填对错与作答时间。"""
+def _mark_last_practice_answered(
+    db: Session,
+    conversation_id: int,
+    is_correct: bool,
+    question_text: str | None = None,
+) -> None:
+    """把该会话中最近一条未作答的错题本记录回填对错与作答时间。
+
+    question_text 用于精确定位（会话内可能有多个刷题会话留下的 pending 记录，
+    只按时间取最近一条可能误标到旧会话的题目）。
+    """
     try:
-        record = (
-            db.query(PracticeRecord)
-            .filter(PracticeRecord.conversation_id == conversation_id, PracticeRecord.is_correct.is_(None))
-            .order_by(PracticeRecord.id.desc())
-            .first()
+        query = db.query(PracticeRecord).filter(
+            PracticeRecord.conversation_id == conversation_id,
+            PracticeRecord.is_correct.is_(None),
         )
+        if question_text:
+            query = query.filter(PracticeRecord.question == (question_text or "")[:4000])
+        record = query.order_by(PracticeRecord.id.desc()).first()
         if record:
             record.is_correct = bool(is_correct)
             record.answered_at = datetime.utcnow()
@@ -458,67 +489,143 @@ async def _stream_chat_impl(
         })
         quiz_session = active_quiz if active_quiz is not None else new_session(topic=route.get("topic") or payload.message)
         exiting = active_quiz is not None and is_quiz_exit(payload.message)
+
+        # 作答轮：本地确定性判定学生上一题对错，先回填错题本并注入上下文，
+        # 使 score / item.correct / 错题本三者一致，不依赖模型是否上报 previous_correct。
+        local_grade: bool | None = None
+        if active_quiz is not None and not exiting:
+            items = active_quiz.get("items") or []
+            if items:
+                local_grade = grade_answer(payload.message, items[-1])
+                if local_grade is not None:
+                    _mark_last_practice_answered(db, conv.id, local_grade, question_text=items[-1].get("question"))
+
         try:
+            quiz_total = int(quiz_session.get("total") or 5)
+            quiz_index = int(quiz_session.get("index") or 0)
+            # 已出满计划题数 → 本次作答即为最后一题，轮次进入收尾
+            quiz_complete = quiz_index >= quiz_total
+
             messages: list[dict[str, Any]] = [{"role": "system", "content": QUIZ_SYSTEM_PROMPT}]
             for h in history[-8:]:
                 messages.append({"role": h.get("role", "user"), "content": str(h.get("content", ""))[:1500]})
-            messages.append({"role": "user", "content": payload.message})
+            user_content = payload.message
+            if local_grade is not None:
+                verdict = "正确" if local_grade else "错误"
+                user_content = (
+                    f"【系统判定：学生上一题作答{verdict}，请以该判定为准填写 previous_correct 并在点评中保持一致】\n\n"
+                    + user_content
+                )
+            messages.append({"role": "user", "content": user_content})
 
-            tools = None if exiting else [QUIZ_TOOL]
-            content, tool_calls = await chat_complete_message(
-                messages,
-                tools=tools,
-                temperature=0.5,
-                max_tokens=4096,
-            )
-            text_out = (content or "").strip()
-            answer_question: dict[str, Any] | None = find_ask_question(tool_calls) if not exiting else None
+            quiz_event: dict[str, Any] | None = None
+            kept_active = False  # 模型未出题且练习未完成 → 保留会话，提示用户重发
 
-            # 容错：若未通过 tool call 捕获到题目但正文中包含新题，从正文中提取
-            if not exiting and answer_question is None:
-                answer_question = try_extract_question_from_text(text_out)
-
-            if exiting or answer_question is None:
-                # 学生结束 / 模型不再出题 → 收尾（小结）
+            if exiting or quiz_complete:
+                # ---- 收尾路径：小结（不挂出题工具，模型只能写总结） ----
+                if quiz_complete and not exiting:
+                    messages.append({
+                        "role": "user",
+                        "content": "【系统提示：本轮练习的全部计划题目已完成，请对整轮练习做总结（答对题数、正确率、重点复习建议），不要再出题。】",
+                    })
+                try:
+                    content, _, _ = await _quiz_llm_call(messages, None)
+                    text_out = (content or "").strip()
+                except Exception as e:
+                    logger.warning("quiz summary generation failed: %s", e)
+                    text_out = ""
                 close_session(quiz_session)
-                quiz_event: dict[str, Any] = {
+                if local_grade is not None:
+                    # 收尾轮：把本地判定的最后一题计入分数，避免小结漏算
+                    quiz_session["score"] = quiz_session.get("score", 0) + (1 if local_grade else 0)
+                if not text_out:
+                    text_out = summary_text(quiz_session)
+                quiz_event = {
                     "action": "summary",
                     "session": serialize_quiz_session(quiz_session),
                 }
             else:
-                apply_tool_args(quiz_session, answer_question)
-                # 错题本落库：先回填上一题的对错，再插入本题 pending 记录
-                if answer_question.get("previous_correct") is not None:
-                    _mark_last_practice_answered(db, conv.id, bool(answer_question["previous_correct"]))
-                _record_practice_question(db, student.id, conv.id, quiz_session, answer_question)
-                index = quiz_session.get("index", 0)
-                question = answer_question.get("question", "")
-                options = answer_question.get("options") or []
-                if question and question not in text_out:
-                    text_out = (text_out + "\n\n" + question).strip()
-                quiz_event = {
-                    "action": "question",
-                    "question": question,
-                    "options": options,
-                    "index": index,
-                    "score": quiz_session.get("score", 0),
-                    "session": serialize_quiz_session(quiz_session),
-                }
+                # ---- 出题路径：强制工具调用 + 正文容错提取 + 续题重试 ----
+                content, tool_calls, _ = await _quiz_llm_call(messages, [QUIZ_TOOL])
+                text_out = (content or "").strip()
+                answer_question: dict[str, Any] | None = find_ask_question(tool_calls)
+                if answer_question is None:
+                    answer_question = try_extract_question_from_text(text_out)
+                if answer_question is None:
+                    # 模型没出题（想提前收尾 / 未调用工具）→ 追加提示强制续题，避免提前结束
+                    push_messages = messages + [{
+                        "role": "user",
+                        "content": f"【系统提示】练习尚未完成（已完成 {quiz_index}/{quiz_total} 题）。请继续通过 ask_question 工具出下一题，暂时不要总结。",
+                    }]
+                    content2, tool_calls2, _ = await _quiz_llm_call(push_messages, [QUIZ_TOOL])
+                    text2 = (content2 or "").strip()
+                    answer_question = find_ask_question(tool_calls2)
+                    if answer_question is None:
+                        answer_question = try_extract_question_from_text(text2)
+                    if text2 and not text_out:
+                        text_out = text2
 
-            if text_out:
-                full_text_parts.append(text_out)
-                yield _sse("token", {"text": text_out})
-            yield _sse("quiz", quiz_event)
-            yield _sse("progress", {
-                "phase": "quiz_session",
-                "agent": "quiz_session",
-                "status": "completed",
-                "detail": "已出题/批改完成。" if quiz_event.get("action") == "question" else "本轮练习结束。",
-            })
+                if answer_question is None:
+                    # 仍没出题 → 保留 active 会话，不结束练习；用户重发后继续
+                    kept_active = True
+                    notice = (
+                        f"⚠️ 模型未能继续出题（已完成 {quiz_index}/{quiz_total} 题）。"
+                        "请再发送一次，或输入「结束练习」结束本轮。"
+                    )
+                    full_text_parts.append(notice)
+                    yield _sse("token", {"text": notice})
+                else:
+                    if local_grade is not None:
+                        # 以本地判定为准，覆盖模型上报值，保证与错题本一致
+                        answer_question["previous_correct"] = local_grade
+                    apply_tool_args(quiz_session, answer_question)
+                    # 错题本落库：先回填上一题的对错（未在作答轮回填时），再插入本题 pending 记录
+                    if answer_question.get("previous_correct") is not None:
+                        items = quiz_session.get("items") or []
+                        prev_question = items[-2].get("question") if len(items) >= 2 else None
+                        _mark_last_practice_answered(db, conv.id, bool(answer_question["previous_correct"]), question_text=prev_question)
+                    _record_practice_question(db, student.id, conv.id, quiz_session, answer_question)
+                    index = quiz_session.get("index", 0)
+                    question = answer_question.get("question", "")
+                    options = answer_question.get("options") or []
+                    if question and question not in text_out:
+                        text_out = (text_out + "\n\n" + question).strip()
+                    quiz_event = {
+                        "action": "question",
+                        "question": question,
+                        "options": options,
+                        "index": index,
+                        "score": quiz_session.get("score", 0),
+                        "session": serialize_quiz_session(quiz_session),
+                    }
+
+            if not kept_active:
+                if text_out:
+                    full_text_parts.append(text_out)
+                    yield _sse("token", {"text": text_out})
+                yield _sse("quiz", quiz_event)
+                yield _sse("progress", {
+                    "phase": "quiz_session",
+                    "agent": "quiz_session",
+                    "status": "completed",
+                    "detail": "已出题/批改完成。" if quiz_event.get("action") == "question" else "本轮练习结束。",
+                })
+            else:
+                yield _sse("progress", {
+                    "phase": "quiz_session",
+                    "agent": "quiz_session",
+                    "status": "completed",
+                    "detail": "模型未出题，会话已保留，等待用户重发继续。",
+                })
             quiz_session_state = serialize_quiz_session(quiz_session)
         except Exception as e:
             logger.exception("quiz_session failed")
-            close_session(quiz_session)
+            if not (quiz_session.get("items") or []):
+                # 一道题都还没出出来 → 结束会话，下次重新开始
+                close_session(quiz_session)
+            else:
+                # 已有题目：保留 active 会话，用户下次重发即可继续，避免一次错误终结整轮刷题
+                logger.warning("quiz session kept active for retry (items=%d)", len(quiz_session.get("items") or []))
             err = f"⚠️ 互动刷题失败：{e}"
             full_text_parts.append(err)
             yield _sse("token", {"text": err})

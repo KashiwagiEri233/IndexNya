@@ -106,6 +106,19 @@ def close_session(session: dict[str, Any]) -> None:
     session["active"] = False
 
 
+def summary_text(session: dict[str, Any]) -> str:
+    """生成本地兜底小结（模型总结失败或不可用时使用）。"""
+    index = int(session.get("index") or 0)
+    score = int(session.get("score") or 0)
+    rate = (score / index) if index > 0 else 0.0
+    parts = [f"✅ 本轮练习结束：共 {index} 题，答对 {score} 题，正确率 {rate:.0%}。"]
+    topic = str(session.get("topic") or "").strip()
+    if topic:
+        parts.append(f"主题：{topic}")
+    parts.append("如需继续练习，请说「再来几题」。")
+    return "\n".join(parts)
+
+
 def serialize(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "active": bool(session.get("active", False)),
@@ -229,6 +242,100 @@ def find_ask_question(tool_calls: list[dict]) -> dict[str, Any] | None:
     return None
 
 
+# ============================================================
+# 4. 本地确定性判定（不依赖模型上报 previous_correct）
+# ============================================================
+
+_ANSWER_PREFIX_RE = re.compile(r"^(?:我的答案|我选的|答案|选)[：:\s]*", re.IGNORECASE)
+_OPTION_PREFIX_RE = re.compile(r"^[A-Da-d][.、)）:\s]\s*")
+_LETTER_RE = re.compile(r"(?<![A-Za-z])([A-Da-d])(?![A-Za-z])")
+_ANSWER_LETTER_RE = re.compile(r"^\s*([A-Da-d])\s*[.、)）:\s]")
+
+
+def _norm_answer_text(s: str) -> str:
+    """归一化作答文本：去「我的答案」等前缀、选项字母前缀、标点空白、转小写。"""
+    s = (s or "").strip().lower()
+    s = _ANSWER_PREFIX_RE.sub("", s)
+    s = _OPTION_PREFIX_RE.sub("", s)
+    return re.sub(r"[，。！？、；;：:\s\-—~～()（）\[\]【】\"'“”‘’]", "", s)
+
+
+def _extract_choice_letter(text: str) -> str | None:
+    """从作答文本提取选项字母（A-D）；文本本身是选项（如 'B. 叶绿体'）时也识别。"""
+    m = _LETTER_RE.search(text or "")
+    if not m:
+        return None
+    letter = m.group(1).upper()
+    if letter not in "ABCD":
+        return None
+    return letter
+
+
+def grade_answer(user_text: str, item: dict | None) -> bool | None:
+    """本地判定学生作答对错；无法自信判定时返回 None（交由模型判定）。
+
+    判定规则（按优先级）：
+    1. 选项题（item.options 非空，或标准答案形如 'B. xxx'）：
+       - 作答能定位到某个选项（精确匹配优先于包含匹配）→ 该选项与答案比对；
+       - 否则作答中含选项字母（A-D）→ 字母与答案字母比对；
+    2. 文本匹配（简答/填空，或选项比对未命中）：归一化后完全相等视为正确；
+       选项题兜底允许答案正文包含于作答（反之亦然）；
+    3. 其余情况返回 None，不强行下结论。
+    """
+    if not item:
+        return None
+    answer = str(item.get("answer") or "").strip()
+    if not answer:
+        return None
+    options = item.get("options") or []
+    text = (user_text or "").strip()
+    if not text:
+        return None
+
+    norm_answer = _norm_answer_text(answer)
+    is_choice = bool(options) or bool(_ANSWER_LETTER_RE.match(answer))
+    answer_letter = _extract_choice_letter(answer) if is_choice else None
+
+    # 1) 选项题：作答与选项列表比对，能定位到具体选项即可判定
+    if options:
+        user_norm = _norm_answer_text(text)
+        matched = None
+        for opt in options:  # 精确匹配优先
+            opt_norm = _norm_answer_text(opt)
+            if user_norm and opt_norm and user_norm == opt_norm:
+                matched = opt
+                break
+        if matched is None:  # 再尝试包含匹配
+            for opt in options:
+                opt_norm = _norm_answer_text(opt)
+                if user_norm and opt_norm and (opt_norm in user_norm or user_norm in opt_norm):
+                    matched = opt
+                    break
+        if matched is not None:
+            opt_letter = _extract_choice_letter(matched)
+            if answer_letter:
+                return opt_letter == answer_letter
+            if norm_answer and _norm_answer_text(matched) == norm_answer:
+                return True
+            return None  # 定位到选项但答案无法对应 → 不下结论
+        user_letter = _extract_choice_letter(text)
+        if user_letter and answer_letter:
+            # 作答只写了字母（或含字母但未匹配到选项正文）→ 按字母判定
+            return user_letter == answer_letter
+
+    # 2) 文本匹配（简答/填空，或选项比对未命中）
+    norm_text = _norm_answer_text(text)
+    if not norm_text or not norm_answer:
+        return None
+    if norm_text == norm_answer:
+        return True
+    # 选项题兜底：作答包含答案正文（如「我的答案：叶绿体」对答案「B. 叶绿体（chloroplast）」）
+    if is_choice and (norm_answer in norm_text or norm_text in norm_answer):
+        return True
+    # 自由作答无法自信判定 → 交由模型判定
+    return None
+
+
 def try_extract_question_from_text(text: str) -> dict[str, Any] | None:
     """当模型未通过 tool_calls 出题但正文实际输出了题目时，从正文提取作为容错 fallback。"""
     if not text:
@@ -253,8 +360,8 @@ def try_extract_question_from_text(text: str) -> dict[str, Any] | None:
                     "previous_correct": "回答错误" not in raw and "❌" not in raw if ("回答正确" in raw or "答对" in raw or "✅" in raw or "❌" in raw or "回答错误" in raw) else None,
                 }
 
-    # 检查是否有明显的出题提示词
-    q_match = re.search(r"(?:下一题[：:]|请问[：:]?|思考题[：:]?)([\s\S]+)$", raw)
+    # 检查是否有明显的出题提示词（下一题 / 请问 / 思考题 / 第 N 题，N 支持 "第 2 题" 带空格）
+    q_match = re.search(r"(?:下一题[：:]|请问[：:]?|思考题[：:]?|第\s*[一二三四五六七八九十0-9]+\s*题[：:\s])([\s\S]+)$", raw)
     if q_match:
         q_text = q_match.group(1).strip()
         if 5 <= len(q_text) <= 500 and "练习结束" not in q_text and "小结" not in q_text and "总结" not in q_text:
