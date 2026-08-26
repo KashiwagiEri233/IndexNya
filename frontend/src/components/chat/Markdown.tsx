@@ -27,8 +27,8 @@ function MermaidBlock({ code }: { code: string }) {
         if (!cancelled && ref.current) {
           const message = String(err?.message || err || "未知错误").slice(0, 120);
           ref.current.innerHTML = `<div class="rounded-xl border border-island-warn/40 bg-island-warn/10 px-3 py-2 text-xs">
-            <div class="font-bold text-[#8a6010]">图示渲染失败：${escapeHtml(message)}</div>
-            <pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded-lg bg-[#463729] p-2 text-[12px] text-[#f8f1de]">${escapeHtml(code)}</pre>
+            <div class="font-bold text-island-yellowDeep">图示渲染失败：${escapeHtml(message)}</div>
+            <pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded-lg bg-island-codeBg p-2 text-[12px] text-island-codeInk">${escapeHtml(code)}</pre>
           </div>`;
         }
       }

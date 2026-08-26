@@ -93,7 +93,7 @@ export default function PracticePage() {
             type="button"
             onClick={repracticeWrong}
             disabled={wrongCount === 0}
-            className="btn-default h-9 px-3.5 text-xs hover:border-island-lavender/60 hover:text-[#7a3fd0]"
+            className="btn-default h-9 px-3.5 text-xs hover:border-island-lavender/60 hover:text-island-lavenderDeep"
             title={wrongCount > 0 ? `重练 ${wrongCount} 道错题` : "还没有答错的题目"}
           >
             <RefreshCw size={13} /> 重练错题{wrongCount > 0 ? `（${wrongCount}）` : ""}

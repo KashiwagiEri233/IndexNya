@@ -153,7 +153,7 @@ export default function UniversePage() {
 
       <div className="mx-auto max-w-5xl space-y-4 p-5">
         {pendingInsight && (
-          <div className="flex items-center gap-2 rounded-[16px] border border-island-lavender/40 bg-island-lavender/10 px-4 py-3 text-xs font-bold text-[#7a3fd0]">
+          <div className="flex items-center gap-2 rounded-[16px] border border-island-lavender/40 bg-island-lavender/10 px-4 py-3 text-xs font-bold text-island-lavenderDeep">
             <Brain size={15} /> 已从对话带入你的原话，补充概念名称后提交评审
           </div>
         )}
@@ -199,9 +199,9 @@ export default function UniversePage() {
                   {verdict.approved ? (
                     <CheckCircle2 size={18} className="text-island-success" />
                   ) : (
-                    <XCircle size={18} className="text-[#b8860b]" />
+                    <XCircle size={18} className="text-island-warn" />
                   )}
-                  <span className={cn("text-sm font-extrabold", verdict.approved ? "text-island-success" : "text-[#8a6010]")}>
+                  <span className={cn("text-sm font-extrabold", verdict.approved ? "text-island-success" : "text-island-yellowDeep")}>
                     {verdict.approved ? `认可！已存入思维宇宙（${verdict.score} 分）` : `暂未认可（${verdict.score} 分）`}
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export default function UniversePage() {
                   <button
                     type="button"
                     onClick={() => setVerdict(null)}
-                    className="mt-2 rounded-full border-2 border-island-warn/50 bg-island-card px-3 py-1 text-xs font-bold text-[#8a6010] transition-colors hover:bg-island-warn/20"
+                    className="mt-2 rounded-full border-2 border-island-warn/50 bg-island-card px-3 py-1 text-xs font-bold text-island-yellowDeep transition-colors hover:bg-island-warn/20"
                   >
                     修改后重试
                   </button>

@@ -27,7 +27,7 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "w-full resize-none rounded-[18px] border-2 border-island-borderStrong/50 bg-white px-4 py-3 text-sm font-medium text-island-ink transition-all duration-200 ease-island placeholder:font-normal placeholder:text-island-muted/70 hover:border-island-borderStrong focus:border-island-accent",
+      "w-full resize-none rounded-[18px] border-2 border-island-accent/40 bg-island-card px-4 py-3 text-sm font-medium text-island-ink transition-all duration-200 ease-island placeholder:font-normal placeholder:text-island-muted/70 hover:border-island-accent/70 focus:border-island-accent",
       className
     )}
     {...props}

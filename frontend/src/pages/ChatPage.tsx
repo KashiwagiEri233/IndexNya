@@ -288,7 +288,7 @@ function SideChatPanel({
     <aside className="relative flex w-[min(430px,42vw)] shrink-0 flex-col border-l border-island-border bg-island-content/60">
       <div className="flex min-h-[4.25rem] items-center justify-between border-b border-island-border px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-island-lavender/25 text-[#7a3fd0]"><GitBranch size={15} /></div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-island-lavender/25 text-island-lavenderDeep"><GitBranch size={15} /></div>
           <div className="min-w-0"><div className="truncate text-sm font-extrabold">侧边对话</div><div className="text-[10px] text-island-muted">基于当前上下文的独立分支</div></div>
         </div>
         <button type="button" onClick={onClose} className="rounded-full p-2 text-island-muted hover:bg-island-card hover:text-island-ink" title="关闭侧边对话"><X size={16} /></button>
@@ -356,7 +356,7 @@ function SideChatPanel({
             <button type="button" onClick={() => setQuote(null)} className="shrink-0 rounded-full p-0.5 text-island-muted hover:bg-island-card hover:text-island-ink" title="移除引用"><X size={12} /></button>
           </div>
         )}
-        <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
+        <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-accent/60">
           <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} rows={2} placeholder="在侧边分支中继续追问…" className="w-full resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none" />
           <div className="flex items-center justify-between border-t border-island-border px-2 py-1.5">
             <span className="max-w-[190px] truncate text-[10px] font-bold text-island-muted">{sideEntry ? `${sideEntry.provider.name} · ${sideEntry.model.name}` : "未选择模型"}</span>
@@ -899,7 +899,7 @@ export default function ChatPage() {
                       onChange={(e) => setEditText(e.target.value)}
                       rows={3}
                       autoFocus
-                      className="w-full resize-none rounded-[14px] border-2 border-island-accent/50 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-island-focus/70"
+                      className="w-full resize-none rounded-[14px] border-2 border-island-accent/50 bg-island-card px-3 py-2 text-sm focus:ring-2 focus:ring-island-accent/60"
                     />
                     <div className="mt-2 flex justify-end gap-2">
                       <button type="button" onClick={() => setEditingId(null)} className="btn-ghost h-8 px-3 text-xs">取消</button>
@@ -1042,7 +1042,7 @@ export default function ChatPage() {
               e.target.value = "";
             }}
           />
-          <div className="relative overflow-visible rounded-bubble border-2 border-island-border bg-island-card shadow-island transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
+          <div className="relative overflow-visible rounded-bubble border-2 border-island-border bg-island-card shadow-island transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-accent/60">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}

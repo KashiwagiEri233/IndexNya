@@ -11,7 +11,7 @@ export const Badge = React.forwardRef<
     default: "bg-island-panel text-island-inkSoft",
     accent: "bg-island-accentSoft text-island-accentDeep",
     success: "bg-island-success/15 text-island-success",
-    warn: "bg-island-warn/20 text-[#8a6010]",
+    warn: "bg-island-warn/20 text-island-yellowDeep",
     error: "bg-island-error/10 text-island-error",
   };
   return (

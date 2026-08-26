@@ -1,12 +1,34 @@
 /** 设置弹窗 — 全屏遮罩 + 居中面板，
  *  左侧导航栏（分区列表），右侧 header（关闭按钮）+ 滚动内容区。 */
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, PlugZap, Settings2, Trash2, Upload, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, Monitor, Moon, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type ModelProvider, type Skill } from "@/lib/api";
-import { useAppStore, modelKeyOf } from "@/stores/app";
+import { useAppStore, modelKeyOf, type ThemeMode } from "@/stores/app";
+import { normalizeHex } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+
+const DEFAULT_ACCENT = "#19c8b9";
+/** 预设色卡：零依赖的原生取色器之外，常用色一键选择 */
+const PRESET_ACCENTS = [
+  "#19c8b9", // 薄荷青绿（默认）
+  "#22b8cf", // 海蓝
+  "#4d7cf6", // 天蓝
+  "#8b5cf6", // 紫罗兰
+  "#ec4899", // 粉红
+  "#f97316", // 暖橙
+  "#eab308", // 暖黄
+  "#22c55e", // 草绿
+  "#a855f7", // 葡萄紫
+  "#64748b", // 雾灰蓝
+];
+
+const THEME_MODES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { id: "light", label: "浅色", icon: Sun },
+  { id: "dark", label: "深色", icon: Moon },
+  { id: "system", label: "跟随系统", icon: Monitor },
+];
 
 const EMPTY_PROVIDER_FORM = { name: "", baseUrl: "", apiKey: "", testModel: "" };
 const EMPTY_MODEL_FORM = { id: "", name: "" };
@@ -34,6 +56,7 @@ export function SettingsDialog() {
   const NAV = [
     { id: "providers", label: "模型提供商", icon: PlugZap },
     { id: "skills", label: "技能", icon: Wand2 },
+    { id: "appearance", label: "外观", icon: Palette },
   ];
   const active = NAV.find((n) => n.id === activeId)?.id ?? NAV[0].id;
 
@@ -82,7 +105,9 @@ export function SettingsDialog() {
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-            {active === "providers" ? <ProvidersSection /> : <SkillsSection />}
+            {active === "providers" && <ProvidersSection />}
+            {active === "skills" && <SkillsSection />}
+            {active === "appearance" && <AppearanceSection />}
           </div>
         </div>
       </div>
@@ -175,7 +200,7 @@ function ProvidersSection() {
           const expanded = expandedId === provider.id;
           const inUse = providerInUse(provider.id);
           return (
-            <div key={provider.id} className={cn("flex flex-col gap-3 rounded-[16px] border-2 px-3.5 py-3", inUse ? "border-island-accent/50 bg-island-accentSoft/30" : "border-island-border bg-white/60")}>
+            <div key={provider.id} className={cn("flex flex-col gap-3 rounded-[16px] border-2 px-3.5 py-3", inUse ? "border-island-accent/50 bg-island-accentSoft/30" : "border-island-border bg-island-card/70")}>
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
@@ -351,7 +376,7 @@ function SkillsSection() {
       <div className="mt-2 flex flex-col gap-2">
         {skills.length === 0 && <div className="rounded-[16px] border-2 border-dashed border-island-borderStrong/40 px-4 py-5 text-center text-sm font-semibold text-island-muted">还没有技能，请在下方上传一个 .zip 技能包。</div>}
         {skills.map((skill) => (
-          <div key={skill.name} className={cn("flex items-center gap-3 rounded-[16px] border-2 px-3.5 py-3", skill.enabled ? "border-island-lavender/40 bg-island-lavender/10" : "border-island-border bg-white/60 opacity-75")}>
+          <div key={skill.name} className={cn("flex items-center gap-3 rounded-[16px] border-2 px-3.5 py-3", skill.enabled ? "border-island-lavender/40 bg-island-lavender/10" : "border-island-border bg-island-card/70 opacity-75")}>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-extrabold text-island-ink">{skill.title}</span>
@@ -366,14 +391,14 @@ function SkillsSection() {
               onClick={() => toggle(skill)}
               className={cn(
                 "relative h-6 w-11 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(61,52,40,0.18)] transition-colors duration-200 ease-island",
-                skill.enabled ? "bg-[#86d67a]" : "bg-island-borderStrong/50"
+                skill.enabled ? "bg-island-success" : "bg-island-borderStrong/50"
               )}
               title={skill.enabled ? "点击关闭（不再被 agent 使用）" : "点击开启"}
             >
               <span
                 className={cn(
                   "absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-[2.5px] bg-island-card transition-all duration-200 ease-island",
-                  skill.enabled ? "left-[22px] border-[#509050]" : "left-0.5 border-island-borderStrong"
+                  skill.enabled ? "left-[22px] border-island-successDeep" : "left-0.5 border-island-borderStrong"
                 )}
               />
             </button>
@@ -385,13 +410,159 @@ function SkillsSection() {
       <div className="mt-2 flex flex-col gap-3 border-t border-island-border pt-4">
         <h3 className="text-sm font-extrabold text-island-ink">上传 .zip 技能包</h3>
         <p className="-mt-1 text-xs leading-5 text-island-muted">压缩包内可直接放 SKILL.md（技能名取压缩包文件名），或放一个/多个技能文件夹（文件夹名即技能标识，内含大小写完全一致的 SKILL.md）。SKILL.md 使用 frontmatter 声明 name / description，可附带 scripts/ 等辅助文件。</p>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-island-borderStrong/50 bg-white/70 px-3 py-4 text-sm font-semibold text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-island-borderStrong/50 bg-island-card/70 px-3 py-4 text-sm font-semibold text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep">
           <Upload size={15} /> {file ? file.name : "选择 .zip 技能包"}
           <input type="file" accept=".zip" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>
         {message && <div className={cn("rounded-[14px] px-3 py-2 text-xs font-semibold", message.ok ? "bg-island-success/10 text-island-success" : "bg-island-error/10 text-island-error")}>{message.text}</div>}
         <div className="flex justify-end">
           <Button type="button" variant="accent" onClick={upload} disabled={busy || !file}><Wand2 size={15} /> {busy ? "安装中…" : "上传并安装"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * 外观：浅色/深色/跟随系统 + 主界面强调色（16 进制自定义）
+ * ============================================================ */
+function AppearanceSection() {
+  const themeMode = useAppStore((s) => s.themeMode);
+  const setThemeMode = useAppStore((s) => s.setThemeMode);
+  const accentColor = useAppStore((s) => s.accentColor);
+  const setAccentColor = useAppStore((s) => s.setAccentColor);
+  const [hexDraft, setHexDraft] = useState(accentColor);
+
+  // accentColor 从外部变化（预设/取色器/恢复默认）时同步草稿
+  useEffect(() => {
+    setHexDraft(accentColor);
+  }, [accentColor]);
+
+  const isDefault = themeMode === "light" && accentColor.toLowerCase() === DEFAULT_ACCENT;
+
+  return (
+    <div className="mx-auto flex max-w-[720px] flex-col gap-3">
+      <div>
+        <h2 className="text-base font-extrabold text-island-ink">外观</h2>
+        <p className="mt-0.5 text-sm leading-6 text-island-muted">切换浅色 / 深色外观；主色（强调色）会全局联动到按钮、高亮、发光与装饰，输入 16 进制色号或从调色盘 / 取色器中挑选。</p>
+      </div>
+
+      {/* 主题模式：三档分段选择 */}
+      <div className="flex flex-col gap-2.5">
+        <h3 className="text-sm font-extrabold text-island-ink flex items-center gap-1.5"><Sun size={14} className="text-island-accentDeep" /> 主题模式</h3>
+        <div className="flex rounded-full border border-island-border bg-island-panel p-1">
+          {THEME_MODES.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setThemeMode(id)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-all duration-200 ease-island",
+                themeMode === id
+                  ? "bg-island-card text-island-ink shadow-soft"
+                  : "text-island-muted hover:text-island-ink/80"
+              )}
+            >
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs leading-5 text-island-muted">
+          {themeMode === "system" ? "跟随操作系统的浅色 / 深色设置，切换系统主题时页面自动更新。" : themeMode === "dark" ? "始终使用深色外观。" : "始终使用浅色外观。"}
+        </p>
+      </div>
+
+      {/* 主色：预设色卡 */}
+      <div className="mt-1 flex flex-col gap-2.5">
+        <h3 className="text-sm font-extrabold text-island-ink flex items-center gap-1.5"><Palette size={14} className="text-island-accentDeep" /> 主界面颜色（强调色）</h3>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {PRESET_ACCENTS.map((hex) => {
+            const active = accentColor.toLowerCase() === hex;
+            return (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => setAccentColor(hex)}
+                title={hex}
+                aria-label={`选择颜色 ${hex}`}
+                className={cn(
+                  "relative h-8 w-8 rounded-full transition-transform duration-150 ease-island hover:scale-110",
+                  active && "ring-2 ring-island-ink/70 ring-offset-2 ring-offset-island-card"
+                )}
+                style={{ backgroundColor: hex }}
+              >
+                {active && (
+                  <Check size={15} className="absolute inset-0 m-auto text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" strokeWidth={3.5} />
+                )}
+              </button>
+            );
+          })}
+          {/* 原生取色器：零依赖 */}
+          <label
+            className="relative flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-island-borderStrong/60 text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep"
+            title="打开取色器"
+          >
+            <Palette size={15} />
+            <input
+              type="color"
+              value={hexDraft}
+              onChange={(e) => {
+                setHexDraft(e.target.value);
+                setAccentColor(e.target.value);
+              }}
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+          </label>
+        </div>
+        <p className="text-xs leading-5 text-island-muted">预设色卡 + 右上角取色器，任选其一；选择后立即全局生效并自动保存。</p>
+      </div>
+
+      {/* 主色：16 进制输入 */}
+      <div className="mt-1 flex flex-col gap-2.5">
+        <h3 className="text-sm font-extrabold text-island-ink flex items-center gap-1.5"><span className="text-island-accentDeep">#</span> 16 进制色号</h3>
+        <div className="flex items-center gap-2.5">
+          <Input
+            value={hexDraft}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setHexDraft(raw);
+              const normalized = normalizeHex(raw);
+              if (normalized) setAccentColor(normalized);
+            }}
+            onBlur={() => {
+              const normalized = normalizeHex(hexDraft);
+              setHexDraft(normalized ?? accentColor);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && normalizeHex(hexDraft)) setAccentColor(normalizeHex(hexDraft)!);
+            }}
+            placeholder="#19c8b9"
+            className="max-w-[180px] font-mono text-sm tracking-wide"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            onClick={() => { setThemeMode("light"); setAccentColor(DEFAULT_ACCENT); }}
+            disabled={isDefault}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border border-island-borderStrong/40 px-3 py-1.5 text-[12px] font-bold transition-colors",
+              isDefault
+                ? "cursor-not-allowed text-island-borderStrong/60"
+                : "bg-island-card text-island-muted hover:border-island-accent hover:text-island-accentDeep"
+            )}
+          >
+            <RotateCcw size={12} /> 恢复默认
+          </button>
+        </div>
+        <p className="text-xs leading-5 text-island-muted">支持 #rrggbb 或 #rgb（如 f0a 即 #ff00aa）；输入合法色号时实时生效，回车确认，输入框失焦自动修正格式。</p>
+      </div>
+
+      {/* 当前色预览 */}
+      <div className="mt-1 flex items-center gap-3 rounded-[16px] border-2 border-dashed border-island-borderStrong/40 px-4 py-3">
+        <span className="h-9 w-9 shrink-0 rounded-full shadow-inner" style={{ backgroundColor: accentColor }} />
+        <div className="min-w-0">
+          <div className="text-sm font-extrabold text-island-ink">当前主色 <span className="ml-1 font-mono text-[13px] font-bold text-island-accentDeep">{accentColor.toUpperCase()}</span></div>
+          <div className="truncate text-xs text-island-muted">深色模式下会自动调和出更亮的悬停 / 强调变体，保证可读性。</div>
         </div>
       </div>
     </div>

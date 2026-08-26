@@ -8,9 +8,9 @@ import { useAppStore, type ExploreCardState } from "@/stores/app";
 import { cn } from "@/lib/utils";
 
 const MODE_META: Record<ExploreMode, { label: string; short: string; icon: typeof ArrowUpRight; badge: string; placeholder: string }> = {
-  child: { label: "子卡片 · 深挖背景", short: "深挖", icon: ArrowUpRight, badge: "bg-island-sky/25 text-[#4358c0]", placeholder: "想深挖哪部分？例如：它的前置知识 / 原理细节…（留空则默认讲解）" },
-  related: { label: "关联卡片 · 横向对比", short: "对比", icon: ArrowRight, badge: "bg-island-orange/25 text-[#a05a28]", placeholder: "想对比哪些方面？例如：它和 XX 有什么区别…（留空则默认发散对比）" },
-  branch: { label: "分支卡片 · 继承上下文", short: "分支", icon: ArrowDown, badge: "bg-island-lavender/25 text-[#7a3fd0]", placeholder: "想从分支聊什么？留空则默认讲解该名词…" },
+  child: { label: "子卡片 · 深挖背景", short: "深挖", icon: ArrowUpRight, badge: "bg-island-sky/25 text-island-skyDeep", placeholder: "想深挖哪部分？例如：它的前置知识 / 原理细节…（留空则默认讲解）" },
+  related: { label: "关联卡片 · 横向对比", short: "对比", icon: ArrowRight, badge: "bg-island-orange/25 text-island-orangeDeep", placeholder: "想对比哪些方面？例如：它和 XX 有什么区别…（留空则默认发散对比）" },
+  branch: { label: "分支卡片 · 继承上下文", short: "分支", icon: ArrowDown, badge: "bg-island-lavender/25 text-island-lavenderDeep", placeholder: "想从分支聊什么？留空则默认讲解该名词…" },
 };
 
 const MODE_ORDER: ExploreMode[] = ["child", "related", "branch"];
@@ -444,7 +444,7 @@ export function ExploreCard({
             重新生成（可修改问题）
           </button>
         ) : (
-          <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card shadow-soft transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-focus/70">
+          <div className="overflow-hidden rounded-[20px] border-2 border-island-border bg-island-card shadow-soft transition-all duration-200 ease-island focus-within:border-island-accent focus-within:ring-2 focus-within:ring-island-accent/60">
             {quote && (
               <div className="flex items-start gap-2 border-b border-island-border bg-island-accentSoft/60 px-2.5 py-1.5 text-xs text-island-ink">
                 <QuoteIcon size={12} className="mt-0.5 shrink-0 text-island-accentDeep" />

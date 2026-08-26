@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * 颜色通过 --rf（正面）/ --rb（燕尾）/ --rk（折角）/ --rt（文字）四个变量控制。
  */
 const RIBBON_COLORS = {
-  teal: { rf: "#19c8b9", rb: "#14a094", rk: "#0b6b64", rt: "#ffffff" },
+  teal: { rf: "rgb(var(--island-accent))", rb: "rgb(var(--island-accentActive))", rk: "rgb(var(--island-accentDeep))", rt: "#ffffff" },
   green: { rf: "#8ac68a", rb: "#509050", rk: "#205020", rt: "#ffffff" },
   purple: { rf: "#b77dee", rb: "#9050d0", rk: "#5a1a9a", rt: "#ffffff" },
   blue: { rf: "#889df0", rb: "#5068d8", rk: "#2030a0", rt: "#ffffff" },

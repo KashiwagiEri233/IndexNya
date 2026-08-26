@@ -1,18 +1,20 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { BookOpen, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
 import { api, type CardRow } from "@/lib/api";
 import { openExploreCard, restoreExploreCard } from "@/lib/explore";
+import { applyTheme, disposeThemeListener } from "@/lib/theme";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 const NAV = [
-  // NookPhone 粉彩应用砖配色
-  { to: "/chat", label: "学习对话", icon: Sparkles, tile: "bg-island-seafoam/35 text-[#2f8a70]" },
-  { to: "/practice", label: "错题本", icon: ClipboardCheck, tile: "bg-island-yellow/45 text-[#8a6010]" },
-  { to: "/literature", label: "文献阅读", icon: ScrollText, tile: "bg-island-sky/30 text-[#4358c0]" },
-  { to: "/universe", label: "思维宇宙", icon: Orbit, tile: "bg-island-lavender/30 text-[#7a3fd0]" },
+  // NookPhone 粉彩应用砖配色（深色下自动换用 *Deep 可读色）
+  { to: "/chat", label: "学习对话", icon: Sparkles, tile: "bg-island-seafoam/35 text-island-seafoamDeep" },
+  { to: "/practice", label: "错题本", icon: ClipboardCheck, tile: "bg-island-yellow/45 text-island-yellowDeep" },
+  { to: "/literature", label: "文献阅读", icon: ScrollText, tile: "bg-island-sky/30 text-island-skyDeep" },
+  { to: "/universe", label: "思维宇宙", icon: Orbit, tile: "bg-island-lavender/30 text-island-lavenderDeep" },
 ];
 
 const CARD_TYPE_META: Record<string, { icon: any; label: string; color: string }> = {
@@ -102,7 +104,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const bumpConversations = useAppStore((s) => s.bumpConversations);
   const bumpCards = useAppStore((s) => s.bumpCards);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const themeMode = useAppStore((s) => s.themeMode);
+  const accentColor = useAppStore((s) => s.accentColor);
   const navigate = useNavigate();
+
+  // 主题：store 变化时重放（main.tsx 已在渲染前应用过一次，这里负责后续同步）
+  useEffect(() => {
+    applyTheme(themeMode, accentColor);
+    return disposeThemeListener;
+  }, [themeMode, accentColor]);
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations", conversationVersion],
@@ -241,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 cn(
                   "group flex items-center gap-3 rounded-[16px] px-3.5 py-3 text-sm font-bold transition-all duration-200 ease-island",
                   isActive
-                    ? "bg-island-card text-island-ink shadow-soft"
+                    ? "bg-island-accentSoft text-island-accentDeep shadow-soft"
                     : "text-island-inkSoft/80 hover:bg-island-card/70 hover:text-island-ink"
                 )
               }
@@ -296,7 +306,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         "flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left text-sm font-semibold transition-colors",
                         depth > 0 ? "pl-1" : "px-3",
                         convId === c.id
-                          ? "bg-island-card text-island-ink shadow-soft"
+                          ? "bg-island-accentSoft text-island-accentDeep shadow-soft"
                           : "text-island-inkSoft/80 hover:bg-island-card/70 hover:text-island-ink"
                       )}
                     >

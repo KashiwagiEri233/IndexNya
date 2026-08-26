@@ -10,9 +10,118 @@
  * ============================================================ */
 
 @layer base {
+  /* ============================================================
+   * island 设计令牌 —— CSS 变量（RGB 三元组，供 tailwind 的
+   * `rgb(var(--island-xxx) / <alpha-value>)` 引用；透明度修饰符可用）
+   * :root = 浅色；.dark = 深色。--island-accent* 一族运行时由
+   * lib/theme.ts 按用户主色覆写。
+   * ============================================================ */
   :root {
     color-scheme: light;
+    /* 背景 */
+    --island-bg: 248 248 240;
+    --island-content: 247 243 223;
+    --island-panel: 240 232 216;
+    --island-card: 255 253 246;
+    --island-canvas: 248 248 240;
+    /* 文字 */
+    --island-ink: 121 79 39;
+    --island-inkSoft: 114 93 66;
+    --island-muted: 159 146 125;
+    --island-faint: 196 184 158;
+    /* 描边 */
+    --island-border: 232 226 214;
+    --island-line: 232 226 214;
+    --island-borderStrong: 170 166 157;
+    /* 主色：薄荷青绿 */
+    --island-accent: 25 200 185;
+    --island-accentHover: 61 212 198;
+    --island-accentActive: 80 185 171;
+    --island-accentSoft: 230 249 246;
+    --island-accentDeep: 20 160 148;
+    /* 状态色 */
+    --island-success: 111 186 44;
+    --island-warn: 245 195 28;
+    --island-error: 224 90 90;
+    --island-focus: 255 204 0;
+    /* 聊天气泡 */
+    --island-user: 255 238 199;
+    --island-assistant: 255 253 246;
+    /* NookPhone 粉彩应用色板 */
+    --island-pink: 248 166 178;
+    --island-lavender: 183 125 238;
+    --island-sky: 136 157 240;
+    --island-yellow: 247 205 103;
+    --island-orange: 229 146 102;
+    --island-seafoam: 130 213 187;
+    --island-sage: 138 198 138;
+    --island-peach: 249 227 211;
+    /* 深色下可读的辅助文字色 */
+    --island-skyDeep: 67 88 192;
+    --island-lavenderDeep: 122 63 208;
+    --island-orangeDeep: 160 90 40;
+    --island-seafoamDeep: 47 138 112;
+    --island-yellowDeep: 138 96 16;
+    /* 代码块 */
+    --island-codeBg: 70 55 41;
+    --island-codeInk: 248 241 222;
+    /* 开关等 */
+    --island-successDeep: 80 144 80;
   }
+
+  .dark {
+    color-scheme: dark;
+    /* 背景：暖黑褐 */
+    --island-bg: 23 21 15;
+    --island-content: 28 26 19;
+    --island-panel: 34 31 23;
+    --island-card: 38 34 22;
+    --island-canvas: 23 21 15;
+    /* 文字：暖米白 */
+    --island-ink: 243 233 214;
+    --island-inkSoft: 216 204 178;
+    --island-muted: 168 156 132;
+    --island-faint: 111 102 83;
+    /* 描边 */
+    --island-border: 55 50 42;
+    --island-line: 55 50 42;
+    --island-borderStrong: 92 85 71;
+    /* 主色（默认薄荷青绿，用户可覆写；深色下加深色 soft 底） */
+    --island-accent: 25 200 185;
+    --island-accentHover: 61 212 198;
+    --island-accentActive: 80 185 171;
+    --island-accentSoft: 18 48 45;
+    --island-accentDeep: 126 232 220;
+    /* 状态色 */
+    --island-success: 143 211 96;
+    --island-warn: 240 201 74;
+    --island-error: 240 138 138;
+    --island-focus: 255 204 0;
+    /* 聊天气泡 */
+    --island-user: 66 58 40;
+    --island-assistant: 38 34 22;
+    /* NookPhone 粉彩应用色板（降饱和变亮） */
+    --island-pink: 207 127 141;
+    --island-lavender: 150 101 196;
+    --island-sky: 111 127 201;
+    --island-yellow: 201 169 78;
+    --island-orange: 193 132 90;
+    --island-seafoam: 97 184 162;
+    --island-sage: 111 173 111;
+    --island-peach: 217 178 154;
+    /* 深色下可读的辅助文字色 */
+    --island-skyDeep: 168 182 255;
+    --island-lavenderDeep: 201 164 255;
+    --island-orangeDeep: 232 160 106;
+    --island-seafoamDeep: 127 216 189;
+    --island-yellowDeep: 224 189 106;
+    /* 代码块 */
+    --island-codeBg: 43 36 27;
+    --island-codeInk: 240 232 214;
+    /* 开关等 */
+    --island-successDeep: 127 201 127;
+  }
+
   html,
   body,
   #root {
@@ -22,8 +131,9 @@
     @apply bg-island-bg text-island-ink font-sans antialiased;
     font-weight: 500;
     background-image:
-      radial-gradient(circle at 90% 5%, rgba(25, 200, 185, .10), transparent 24rem),
-      radial-gradient(circle at 5% 93%, rgba(247, 205, 103, .18), transparent 22rem);
+      radial-gradient(circle at 90% 5%, rgb(var(--island-accent) / .10), transparent 24rem),
+      radial-gradient(circle at 5% 93%, rgb(var(--island-warn) / .18), transparent 22rem);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   * {
     @apply border-island-border;
@@ -33,20 +143,20 @@
   textarea {
     font: inherit;
   }
-  /* 焦点：按钮用薄荷青绿，绝不用蓝 */
+  /* 焦点：用主色，绝不用蓝 */
   button:focus-visible,
   [role="button"]:focus-visible {
-    outline: 2px solid #19c8b9;
+    outline: 2px solid rgb(var(--island-accent));
     outline-offset: 2px;
   }
-  /* 输入类控件用暖黄焦点 */
+  /* 输入类控件焦点同样跟随主色 */
   input:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #ffcc00;
+    outline: 2px solid rgb(var(--island-accent));
     outline-offset: 1px;
   }
   ::selection {
-    background: rgba(245, 195, 28, .35);
+    background: rgb(var(--island-warn) / .35);
   }
 }
 
@@ -66,7 +176,7 @@
     @apply btn bg-island-accent text-white shadow-btn-3d-teal hover:-translate-y-px hover:bg-island-accentHover hover:shadow-btn-3d-teal-hover active:translate-y-[2px] active:bg-island-accentActive active:shadow-btn-3d-teal-active;
   }
   .btn-default {
-    @apply btn border-2 border-island-borderStrong/50 bg-island-bg text-island-ink shadow-soft hover:-translate-y-px hover:border-island-accent hover:text-island-accent hover:shadow-island;
+    @apply btn border-2 border-island-accent/40 bg-island-accentSoft text-island-accentDeep shadow-soft hover:-translate-y-px hover:border-island-accent hover:bg-island-accent hover:text-white hover:shadow-island;
   }
   .btn-ghost {
     @apply btn text-island-inkSoft hover:bg-island-panel;
@@ -79,7 +189,7 @@
 
   /* ---------- 输入框：pill、默认无阴影、暖黄焦点 ---------- */
   .input {
-    @apply w-full rounded-full border-2 border-island-borderStrong/50 bg-white px-4 py-2.5 text-sm font-medium text-island-ink transition-all duration-200 ease-island placeholder:font-normal placeholder:text-island-muted/70 hover:border-island-borderStrong focus:border-island-accent;
+    @apply w-full rounded-full border-2 border-island-accent/40 bg-island-card px-4 py-2.5 text-sm font-medium text-island-ink transition-all duration-200 ease-island placeholder:font-normal placeholder:text-island-muted/70 hover:border-island-accent/70 focus:border-island-accent;
   }
 
   .chip {
@@ -100,15 +210,15 @@
     @apply rounded-island border border-island-border bg-island-card/90;
   }
   .island-dot-pattern {
-    background-image: radial-gradient(rgba(25, 200, 185, .18) 1px, transparent 1px);
+    background-image: radial-gradient(rgb(var(--island-accent) / .18) 1px, transparent 1px);
     background-size: 16px 16px;
   }
 
   /* ---------- Title 燕尾飘带（还原组件库 Title） ---------- */
   .ribbon {
-    --rf: #19c8b9;
-    --rb: #14a094;
-    --rk: #0b6b64;
+    --rf: rgb(var(--island-accent));
+    --rb: rgb(var(--island-accentActive));
+    --rk: rgb(var(--island-accentDeep));
     --rt: #ffffff;
     position: relative;
     display: inline-flex;
@@ -200,7 +310,7 @@
 .prose-island ol { @apply my-2 list-decimal pl-6; }
 .prose-island li { @apply my-1; }
 .prose-island code { @apply rounded-lg bg-island-accentSoft px-1.5 py-0.5 font-mono text-[13px] text-island-accentDeep; }
-.prose-island pre { @apply my-3 overflow-x-auto rounded-island bg-[#463729] p-4 text-[13px] text-[#f8f1de] shadow-soft; }
+.prose-island pre { @apply my-3 overflow-x-auto rounded-island bg-island-codeBg p-4 text-[13px] text-island-codeInk shadow-soft; }
 .prose-island pre code { @apply bg-transparent p-0 text-inherit; }
 .prose-island blockquote { @apply my-2 border-l-4 border-island-orange pl-3 italic text-island-muted; }
 .prose-island table { @apply my-3 w-full border-collapse text-sm; }

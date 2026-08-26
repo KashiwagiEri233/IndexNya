@@ -63,9 +63,9 @@ export function ExploreDock() {
   const treeRows = buildTreeRows();
 
   const MODE_ICON: Record<string, { icon: typeof ArrowUpRight; cls: string }> = {
-    child: { icon: ArrowUpRight, cls: "text-[#4358c0]" },
-    related: { icon: ArrowRight, cls: "text-[#a05a28]" },
-    branch: { icon: ArrowDown, cls: "text-[#7a3fd0]" },
+    child: { icon: ArrowUpRight, cls: "text-island-skyDeep" },
+    related: { icon: ArrowRight, cls: "text-island-orangeDeep" },
+    branch: { icon: ArrowDown, cls: "text-island-lavenderDeep" },
   };
   const STATUS_DOT: Record<string, string> = {
     pending: "bg-island-faint",
@@ -121,9 +121,9 @@ export function ExploreDock() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             <div className="flex items-center gap-2 rounded-[12px] bg-island-card/80 p-1.5 text-[10px] font-bold leading-4 text-island-muted">
-              <span className="inline-flex items-center gap-0.5"><ArrowUpRight size={10} className="text-[#4358c0]" /> 深挖</span>
-              <span className="inline-flex items-center gap-0.5"><ArrowRight size={10} className="text-[#a05a28]" /> 对比</span>
-              <span className="inline-flex items-center gap-0.5"><ArrowDown size={10} className="text-[#7a3fd0]" /> 分支</span>
+              <span className="inline-flex items-center gap-0.5"><ArrowUpRight size={10} className="text-island-skyDeep" /> 深挖</span>
+              <span className="inline-flex items-center gap-0.5"><ArrowRight size={10} className="text-island-orangeDeep" /> 对比</span>
+              <span className="inline-flex items-center gap-0.5"><ArrowDown size={10} className="text-island-lavenderDeep" /> 分支</span>
             </div>
             <div className="mt-1.5 space-y-px">
               {treeRows.map((row) => {

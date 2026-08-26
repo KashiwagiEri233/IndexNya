@@ -5,51 +5,62 @@ export default {
   theme: {
     extend: {
       colors: {
-        // animal-island-ui 设计令牌（docs/design-system/design-tokens.md）
+        // animal-island-ui 设计令牌 —— 值以 CSS 变量承载（:root 浅色 / .dark 深色），
+        // 主色 accent 一族可由用户在设置中自定义并写入 --island-accent*。
         island: {
           // 背景：奶油米白 / 羊皮纸内容区 / 次级暖米
-          bg: "#f8f8f0",
-          content: "#f7f3df",
-          panel: "#f0e8d8",
-          card: "#fffdf6",
-          canvas: "#f8f8f0",
+          bg: "rgb(var(--island-bg) / <alpha-value>)",
+          content: "rgb(var(--island-content) / <alpha-value>)",
+          panel: "rgb(var(--island-panel) / <alpha-value>)",
+          card: "rgb(var(--island-card) / <alpha-value>)",
+          canvas: "rgb(var(--island-canvas) / <alpha-value>)",
           // 文字：大地棕色系（禁止纯黑）
-          ink: "#794f27",
-          inkSoft: "#725d42",
-          muted: "#9f927d",
-          faint: "#c4b89e",
+          ink: "rgb(var(--island-ink) / <alpha-value>)",
+          inkSoft: "rgb(var(--island-inkSoft) / <alpha-value>)",
+          muted: "rgb(var(--island-muted) / <alpha-value>)",
+          faint: "rgb(var(--island-faint) / <alpha-value>)",
           // 描边
-          border: "#e8e2d6",
-          line: "#e8e2d6",
-          borderStrong: "#aaa69d",
-          // 主色：薄荷青绿
-          accent: "#19c8b9",
-          accentHover: "#3dd4c6",
-          accentActive: "#50b9ab",
-          accentSoft: "#e6f9f6",
-          accentDeep: "#14a094",
+          border: "rgb(var(--island-border) / <alpha-value>)",
+          line: "rgb(var(--island-line) / <alpha-value>)",
+          borderStrong: "rgb(var(--island-borderStrong) / <alpha-value>)",
+          // 主色：薄荷青绿（用户可自定义 → 运行时写入 --island-accent*）
+          accent: "rgb(var(--island-accent) / <alpha-value>)",
+          accentHover: "rgb(var(--island-accentHover) / <alpha-value>)",
+          accentActive: "rgb(var(--island-accentActive) / <alpha-value>)",
+          accentSoft: "rgb(var(--island-accentSoft) / <alpha-value>)",
+          accentDeep: "rgb(var(--island-accentDeep) / <alpha-value>)",
           // 状态色
-          success: "#6fba2c",
-          warn: "#f5c31c",
-          error: "#e05a5a",
-          focus: "#ffcc00",
+          success: "rgb(var(--island-success) / <alpha-value>)",
+          warn: "rgb(var(--island-warn) / <alpha-value>)",
+          error: "rgb(var(--island-error) / <alpha-value>)",
+          focus: "rgb(var(--island-focus) / <alpha-value>)",
           // 聊天气泡
-          user: "#ffeec7",
-          assistant: "#fffdf6",
-          // NookPhone 粉彩应用色板
-          pink: "#f8a6b2",
-          lavender: "#b77dee",
-          sky: "#889df0",
-          yellow: "#f7cd67",
-          orange: "#e59266",
-          seafoam: "#82d5bb",
-          sage: "#8ac68a",
+          user: "rgb(var(--island-user) / <alpha-value>)",
+          assistant: "rgb(var(--island-assistant) / <alpha-value>)",
+          // NookPhone 粉彩应用色板（深色模式下降饱和变亮）
+          pink: "rgb(var(--island-pink) / <alpha-value>)",
+          lavender: "rgb(var(--island-lavender) / <alpha-value>)",
+          sky: "rgb(var(--island-sky) / <alpha-value>)",
+          yellow: "rgb(var(--island-yellow) / <alpha-value>)",
+          orange: "rgb(var(--island-orange) / <alpha-value>)",
+          seafoam: "rgb(var(--island-seafoam) / <alpha-value>)",
+          sage: "rgb(var(--island-sage) / <alpha-value>)",
           // 兼容旧命名的别名
-          mint: "#82d5bb",
-          teal: "#19c8b9",
-          coral: "#e59266",
-          peach: "#f9e3d3",
-          butter: "#f7cd67",
+          mint: "rgb(var(--island-seafoam) / <alpha-value>)",
+          teal: "rgb(var(--island-accent) / <alpha-value>)",
+          coral: "rgb(var(--island-orange) / <alpha-value>)",
+          peach: "rgb(var(--island-peach) / <alpha-value>)",
+          butter: "rgb(var(--island-yellow) / <alpha-value>)",
+          // 深色下可读的辅助文字色（导航色砖 / 探索分类徽标等）
+          skyDeep: "rgb(var(--island-skyDeep) / <alpha-value>)",
+          lavenderDeep: "rgb(var(--island-lavenderDeep) / <alpha-value>)",
+          orangeDeep: "rgb(var(--island-orangeDeep) / <alpha-value>)",
+          seafoamDeep: "rgb(var(--island-seafoamDeep) / <alpha-value>)",
+          yellowDeep: "rgb(var(--island-yellowDeep) / <alpha-value>)",
+          // 代码块与开关等辅助色
+          codeBg: "rgb(var(--island-codeBg) / <alpha-value>)",
+          codeInk: "rgb(var(--island-codeInk) / <alpha-value>)",
+          successDeep: "rgb(var(--island-successDeep) / <alpha-value>)",
         },
       },
       fontFamily: {
@@ -77,9 +88,9 @@ export default {
         "btn-3d": "0 5px 0 0 #bdaea0",
         "btn-3d-hover": "0 6px 0 0 #bdaea0",
         "btn-3d-active": "0 1px 0 0 #bdaea0",
-        "btn-3d-teal": "0 5px 0 0 #14a094",
-        "btn-3d-teal-hover": "0 6px 0 0 #14a094",
-        "btn-3d-teal-active": "0 1px 0 0 #14a094",
+        "btn-3d-teal": "0 5px 0 0 var(--island-accentDeep)",
+        "btn-3d-teal-hover": "0 6px 0 0 var(--island-accentDeep)",
+        "btn-3d-teal-active": "0 1px 0 0 var(--island-accentDeep)",
         "input-3d": "0 3px 0 0 #d4c9b4",
       },
       transitionTimingFunction: {

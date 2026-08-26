@@ -6,6 +6,9 @@ import type { ChatTerm, ExploreMode, ModelPayload, ModelProvider, ProviderModel 
 /** 模型推理强度（与 pi-ai 级别一致，随请求透传；off = 不传参由接口默认）。 */
 export type ReasoningLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
+/** 主题模式：浅色 / 深色 / 跟随系统。 */
+export type ThemeMode = "light" | "dark" | "system";
+
 /** 选中模型的 key：`{providerId}::{modelId}`（供消息/卡片记录与请求组合）。 */
 export function modelKeyOf(providerId: string, modelId: string) {
   return `${providerId}::${modelId}`;
@@ -107,6 +110,12 @@ interface AppState {
   reasoningEffort: ReasoningLevel;
   setReasoningEffort: (effort: ReasoningLevel) => void;
 
+  // 外观主题：模式（浅色/深色/跟随系统）+ 主色（十六进制，默认薄荷青绿 #19c8b9）
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
+  accentColor: string;
+  setAccentColor: (hex: string) => void;
+
   // 触发对话/卡片/文献/宇宙/错题本刷新的计数器
   conversationVersion: number;
   bumpConversations: () => void;
@@ -191,6 +200,11 @@ export const useAppStore = create<AppState>()(
       reasoningEffort: "off",
       setReasoningEffort: (effort) => set({ reasoningEffort: effort }),
 
+      themeMode: "light",
+      setThemeMode: (mode) => set({ themeMode: mode }),
+      accentColor: "#19c8b9",
+      setAccentColor: (hex) => set({ accentColor: hex }),
+
       // 触发对话/错题本等刷新的计数器
       conversationVersion: 0,
       bumpConversations: () => set({ conversationVersion: Date.now() }),
@@ -245,7 +259,7 @@ export const useAppStore = create<AppState>()(
     {
       name: "learning-agent-store",
       // 持久化当前对话和浏览器本地的模型提供商配置；学生对象每次从后端拉取
-      partialize: (s) => ({ convId: s.convId, providers: s.providers, selectedModelKey: s.selectedModelKey, reasoningEffort: s.reasoningEffort }),
+      partialize: (s) => ({ convId: s.convId, providers: s.providers, selectedModelKey: s.selectedModelKey, reasoningEffort: s.reasoningEffort, themeMode: s.themeMode, accentColor: s.accentColor }),
       // 兼容旧版本：扁平 models 列表 → 每个旧模型迁移为一个独立提供商（保留 baseUrl/apiKey/模型）
       merge: (persistedState, currentState) => {
         const persisted = (persistedState || {}) as Partial<AppState> & { models?: unknown[]; selectedModelId?: unknown };
