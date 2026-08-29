@@ -1,7 +1,7 @@
 /** 设置弹窗 — 全屏遮罩 + 居中面板，
  *  左侧导航栏（分区列表），右侧 header（关闭按钮）+ 滚动内容区。 */
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Monitor, Moon, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type ModelProvider, type Skill } from "@/lib/api";
@@ -57,6 +57,7 @@ export function SettingsDialog() {
     { id: "providers", label: "模型提供商", icon: PlugZap },
     { id: "skills", label: "技能", icon: Wand2 },
     { id: "appearance", label: "外观", icon: Palette },
+    { id: "data", label: "数据", icon: Database },
   ];
   const active = NAV.find((n) => n.id === activeId)?.id ?? NAV[0].id;
 
@@ -108,6 +109,7 @@ export function SettingsDialog() {
             {active === "providers" && <ProvidersSection />}
             {active === "skills" && <SkillsSection />}
             {active === "appearance" && <AppearanceSection />}
+            {active === "data" && <DataSection />}
           </div>
         </div>
       </div>
@@ -563,6 +565,136 @@ function AppearanceSection() {
         <div className="min-w-0">
           <div className="text-sm font-extrabold text-island-ink">当前主色 <span className="ml-1 font-mono text-[13px] font-bold text-island-accentDeep">{accentColor.toUpperCase()}</span></div>
           <div className="truncate text-xs text-island-muted">深色模式下会自动调和出更亮的悬停 / 强调变体，保证可读性。</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * 数据分区：导出 session log（全量备份）+ 导入（覆盖恢复 / 合并追加）
+ * ============================================================ */
+
+function DataSection() {
+  const bumpConversations = useAppStore((s) => s.bumpConversations);
+  const bumpCards = useAppStore((s) => s.bumpCards);
+  const bumpLiteratures = useAppStore((s) => s.bumpLiteratures);
+  const bumpUniverse = useAppStore((s) => s.bumpUniverse);
+  const bumpPractice = useAppStore((s) => s.bumpPractice);
+  const setOpen = useAppStore((s) => s.setSettingsOpen);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<"restore" | "merge">("merge");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleExport() {
+    setMessage(null);
+    try {
+      const data = await api.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `indexnya-sessionlog-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setMessage({ ok: true, text: "已导出 session log 文件（含全部对话、探索卡片、文献、思维宇宙与错题本）。" });
+    } catch (e: any) {
+      setMessage({ ok: false, text: `导出失败：${e.message}` });
+    }
+  }
+
+  async function handleImport() {
+    if (!file) {
+      alert("请先选择一个 session log 文件（.json）。");
+      return;
+    }
+    if (mode === "restore") {
+      const ok = window.confirm("「覆盖恢复」将清空当前全部数据，并用文件内容完整还原为导出时的状态。此操作不可撤销，确定继续吗？");
+      if (!ok) return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.importData(file, mode);
+      setMessage({ ok: true, text: result.message });
+      bumpConversations();
+      bumpCards();
+      bumpLiteratures();
+      bumpUniverse();
+      bumpPractice();
+      setFile(null);
+      if (mode === "restore") setOpen(false);
+    } catch (e: any) {
+      setMessage({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-[720px] flex-col gap-3">
+      <div>
+        <h2 className="text-base font-extrabold text-island-ink">数据</h2>
+        <p className="mt-0.5 text-sm leading-6 text-island-muted">导出完整的 session log 备份文件（JSON），之后可随时导入恢复或迁移到另一台设备。</p>
+      </div>
+
+      {/* 导出 */}
+      <div className="flex flex-col gap-3 rounded-[16px] border-2 border-island-border bg-island-card/70 p-4">
+        <div className="flex items-center gap-2">
+          <Download size={15} className="text-island-accentDeep" />
+          <h3 className="text-sm font-extrabold text-island-ink">导出 session log</h3>
+        </div>
+        <p className="text-xs leading-5 text-island-muted">包含全部对话与消息、探索卡片树、文献、思维宇宙理解、错题本，可完美恢复聊天记录。</p>
+        <div className="flex justify-end">
+          <Button type="button" variant="accent" onClick={handleExport}><Download size={15} /> 导出全部数据</Button>
+        </div>
+      </div>
+
+      {/* 导入 */}
+      <div className="flex flex-col gap-3 rounded-[16px] border-2 border-island-border bg-island-card/70 p-4">
+        <div className="flex items-center gap-2">
+          <FileJson size={15} className="text-island-accentDeep" />
+          <h3 className="text-sm font-extrabold text-island-ink">导入 session log</h3>
+        </div>
+
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-island-borderStrong/50 bg-island-card/70 px-3 py-3.5 text-sm font-semibold text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep">
+          <Upload size={15} /> {file ? file.name : "选择 session log 文件（.json）"}
+          <input type="file" accept=".json,application/json" className="hidden" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setMessage(null); }} />
+        </label>
+
+        {/* 导入模式 */}
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold text-island-muted">导入方式</span>
+          <label className="flex items-start gap-2.5 rounded-[14px] border border-island-border bg-island-card px-3 py-2.5 cursor-pointer">
+            <input type="radio" name="import-mode" checked={mode === "merge"} onChange={() => setMode("merge")} className="mt-0.5 accent-[var(--island-accent)]" />
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-island-ink">合并追加（推荐）</span>
+              <span className="block text-xs text-island-muted">保留现有数据，导入内容作为新数据加入，不影响已有记录。</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 rounded-[14px] border border-island-border bg-island-card px-3 py-2.5 cursor-pointer">
+            <input type="radio" name="import-mode" checked={mode === "restore"} onChange={() => setMode("restore")} className="mt-0.5 accent-[var(--island-accent)]" />
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-island-ink">覆盖恢复</span>
+              <span className="block text-xs text-island-muted">清空当前全部数据，用文件内容完整还原（保留原始对话结构）。</span>
+            </span>
+          </label>
+        </div>
+
+        {message && (
+          <div className={cn("rounded-[14px] px-3 py-2 text-xs font-semibold", message.ok ? "bg-island-success/10 text-island-success" : "bg-island-error/10 text-island-error")}>
+            {message.text}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button type="button" variant="accent" onClick={handleImport} disabled={busy || !file}>
+            <Upload size={15} /> {busy ? "导入中…" : mode === "restore" ? "覆盖恢复" : "合并导入"}
+          </Button>
         </div>
       </div>
     </div>

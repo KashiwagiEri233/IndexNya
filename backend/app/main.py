@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 # 注册路由
-from .routers import chat, hierarchy, image_understanding, literature, practice, resources, skills, tutoring, universe  # noqa: E402
+from .routers import chat, data, hierarchy, image_understanding, literature, practice, resources, skills, tutoring, universe  # noqa: E402
 
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(resources.router, prefix="/api/resources", tags=["resources"])
@@ -49,6 +49,7 @@ app.include_router(literature.router, prefix="/api/literature", tags=["literatur
 app.include_router(universe.router, prefix="/api/universe", tags=["universe"])
 app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
 app.include_router(practice.router, prefix="/api/practice", tags=["practice"])
+app.include_router(data.router, prefix="/api/data", tags=["data"])
 
 
 @app.get("/api/health", tags=["meta"])

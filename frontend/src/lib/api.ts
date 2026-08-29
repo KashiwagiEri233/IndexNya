@@ -578,4 +578,23 @@ export const api = {
       await fetch(`${API_BASE}/universe/${understandingId}`, { method: "DELETE" })
     );
   },
+
+  // ===== 数据导出 / 导入（session log 备份与恢复） =====
+  async exportData() {
+    return j<{ format: string; version: number; exported_at: string; data: Record<string, any[]> }>(
+      await fetch(`${API_BASE}/data/export`)
+    );
+  },
+
+  async importData(file: File, mode: "restore" | "merge") {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("mode", mode);
+    const resp = await fetch(`${API_BASE}/data/import`, { method: "POST", body: form });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`导入失败：${resp.status} ${t}`);
+    }
+    return resp.json() as Promise<{ mode: string; message: string; imported: Record<string, number> }>;
+  },
 };
