@@ -1,11 +1,11 @@
 /** 设置弹窗 — 全屏遮罩 + 居中面板，
  *  左侧导航栏（分区列表），右侧 header（关闭按钮）+ 滚动内容区。 */
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, type ModelProvider, type Skill } from "@/lib/api";
-import { useAppStore, modelKeyOf, type ThemeMode } from "@/stores/app";
+import { api, type Conversation, type ModelProvider, type Skill } from "@/lib/api";
+import { useAppStore, modelKeyOf, requestModelOf, resolveSelectedModel, type ThemeMode } from "@/stores/app";
 import { normalizeHex } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -582,11 +582,70 @@ function DataSection() {
   const bumpUniverse = useAppStore((s) => s.bumpUniverse);
   const bumpPractice = useAppStore((s) => s.bumpPractice);
   const setOpen = useAppStore((s) => s.setSettingsOpen);
+  const providers = useAppStore((s) => s.providers);
+  const selectedModelKey = useAppStore((s) => s.selectedModelKey);
 
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<"restore" | "merge">("merge");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // 导出对话为笔记 / 导图
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [noteFormat, setNoteFormat] = useState<"both" | "notes" | "mindmap">("both");
+  const [noteMode, setNoteMode] = useState<"direct" | "ai">("direct");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteMessage, setNoteMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    api.getConversations().then((rows) => {
+      setConversations(rows);
+      setSelectedIds(new Set(rows.filter((c) => c.parent_conversation_id == null).map((c) => c.id)));
+    }).catch(() => setConversations([]));
+  }, []);
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleExportNotes() {
+    if (selectedIds.size === 0) {
+      alert("请至少勾选一个对话。");
+      return;
+    }
+    setNoteBusy(true);
+    setNoteMessage(null);
+    try {
+      const entry = resolveSelectedModel({ providers, selectedModelKey });
+      const payload = {
+        conversation_ids: [...selectedIds].sort((a, b) => a - b),
+        format: noteFormat,
+        mode: noteMode,
+        model: noteMode === "ai" ? requestModelOf(entry) : undefined,
+      };
+      const result = await api.exportNotes(payload);
+      const blob = new Blob([result.content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setNoteMessage({ ok: true, text: `已导出 ${selectedIds.size} 个对话到 ${result.filename}` });
+    } catch (e: any) {
+      setNoteMessage({ ok: false, text: e.message });
+    } finally {
+      setNoteBusy(false);
+    }
+  }
 
   async function handleExport() {
     setMessage(null);
@@ -694,6 +753,92 @@ function DataSection() {
         <div className="flex justify-end">
           <Button type="button" variant="accent" onClick={handleImport} disabled={busy || !file}>
             <Upload size={15} /> {busy ? "导入中…" : mode === "restore" ? "覆盖恢复" : "合并导入"}
+          </Button>
+        </div>
+      </div>
+
+      {/* 导出对话为笔记 / 思维导图 */}
+      <div className="flex flex-col gap-3 rounded-[16px] border-2 border-island-border bg-island-card/70 p-4">
+        <div className="flex items-center gap-2">
+          <NotebookPen size={15} className="text-island-accentDeep" />
+          <h3 className="text-sm font-extrabold text-island-ink">导出对话为笔记 / 思维导图</h3>
+        </div>
+        <p className="text-xs leading-5 text-island-muted">勾选要导出的对话，选择文件形式与生成方式，导出为 Markdown 文件。</p>
+
+        {/* 对话多选 */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-island-muted">选择对话（{selectedIds.size} 个）</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setSelectedIds(new Set(conversations.map((c) => c.id)))} className="text-[11px] font-bold text-island-accentDeep hover:underline">全选</button>
+              <button type="button" onClick={() => setSelectedIds(new Set())} className="text-[11px] font-bold text-island-muted hover:underline">清空</button>
+            </div>
+          </div>
+          <div className="max-h-44 overflow-y-auto rounded-[14px] border border-island-border bg-island-panel/50 p-1.5">
+            {conversations.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs font-semibold text-island-muted">还没有对话</div>
+            ) : (
+              conversations.map((c) => (
+                <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-[10px] px-2 py-1.5 hover:bg-island-card">
+                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-[var(--island-accent)]" />
+                  <span className="min-w-0 flex-1 truncate text-xs text-island-ink">{c.title}</span>
+                  {c.parent_conversation_id != null && <span className="shrink-0 text-[10px] text-island-lavender">分支</span>}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* 文件形式 */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-island-muted">文件形式</span>
+          <div className="flex flex-wrap gap-1.5">
+            {([["both", "笔记 + 导图"], ["notes", "仅笔记"], ["mindmap", "仅思维导图"]] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setNoteFormat(value)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-bold transition-colors",
+                  noteFormat === value ? "border-island-accent bg-island-accentSoft text-island-accentDeep" : "border-island-border bg-island-card text-island-muted hover:text-island-ink"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 生成方式 */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-island-muted">生成方式</span>
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-start gap-2.5 rounded-[14px] border border-island-border bg-island-card px-3 py-2 cursor-pointer">
+              <input type="radio" name="note-mode" checked={noteMode === "direct"} onChange={() => setNoteMode("direct")} className="mt-0.5 accent-[var(--island-accent)]" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-island-ink">直接整理（推荐）</span>
+                <span className="block text-xs text-island-muted">不调模型，忠实整理对话原文，稳定快速。</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5 rounded-[14px] border border-island-border bg-island-card px-3 py-2 cursor-pointer">
+              <input type="radio" name="note-mode" checked={noteMode === "ai"} onChange={() => setNoteMode("ai")} className="mt-0.5 accent-[var(--island-accent)]" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-island-ink">AI 提炼</span>
+                <span className="block text-xs text-island-muted">调用当前模型提炼知识点结构，更精炼（需模型、较慢）。</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {noteMessage && (
+          <div className={cn("rounded-[14px] px-3 py-2 text-xs font-semibold", noteMessage.ok ? "bg-island-success/10 text-island-success" : "bg-island-error/10 text-island-error")}>
+            {noteMessage.text}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button type="button" variant="accent" onClick={handleExportNotes} disabled={noteBusy || selectedIds.size === 0}>
+            <Download size={15} /> {noteBusy ? "导出中…" : "导出笔记 / 导图"}
           </Button>
         </div>
       </div>

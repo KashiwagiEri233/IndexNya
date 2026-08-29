@@ -597,4 +597,20 @@ export const api = {
     }
     return resp.json() as Promise<{ mode: string; message: string; imported: Record<string, number> }>;
   },
+
+  /** 把选中对话导出为笔记 / 思维导图（markdown）。 */
+  async exportNotes(payload: {
+    conversation_ids: number[];
+    format: "both" | "notes" | "mindmap";
+    mode: "direct" | "ai";
+    model?: ModelPayload;
+  }) {
+    return j<{ filename: string; content: string }>(
+      await fetch(`${API_BASE}/data/export-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+    );
+  },
 };

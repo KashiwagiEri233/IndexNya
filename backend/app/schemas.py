@@ -190,3 +190,16 @@ class UniverseGraphOut(BaseModel):
 class AnchorOut(BaseModel):
     topic: str
     anchors: list[dict[str, Any]]
+
+
+# ===== 数据导出（session log / 笔记导出） =====
+class NotesExportRequest(BaseModel):
+    """把选中对话导出为笔记/思维导图。
+
+    format: both（笔记+导图）/ notes（仅笔记）/ mindmap（仅导图）
+    mode:   direct（直接整理原文）/ ai（调用模型提炼）
+    """
+    conversation_ids: list[int]
+    format: str = "both"
+    mode: str = "direct"
+    model: Optional[ChatModelConfig] = None

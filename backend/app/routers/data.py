@@ -1,4 +1,4 @@
-"""数据导出/导入路由 — session log 备份与恢复。"""
+"""数据导出/导入路由 — session log 备份与恢复 + 对话导出为笔记/导图。"""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..schemas import NotesExportRequest
 from ..services.data_service import export_data, import_data
+from ..services.notes_service import export_notes
 from ..services.student_service import get_local_student_id
 
 router = APIRouter()
@@ -50,3 +52,22 @@ async def import_sessionlog(
         return import_data(db, get_local_student_id(db), data, mode)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@router.post("/export-notes")
+async def export_notes_endpoint(payload: NotesExportRequest, db: Session = Depends(get_db)) -> dict:
+    """把选中对话导出为笔记 / 思维导图（markdown）。"""
+    fmt = payload.format if payload.format in ("both", "notes", "mindmap") else "both"
+    mode = payload.mode if payload.mode in ("direct", "ai") else "direct"
+    try:
+        result = await export_notes(
+            db,
+            payload.conversation_ids,
+            fmt=fmt,
+            mode=mode,
+            model=payload.model.model_dump(exclude_none=True) if payload.model else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return result
+
