@@ -311,9 +311,13 @@ def _merge(db: Session, student_id: int, payload: dict) -> dict[str, int]:
 
 
 def import_data(db: Session, student_id: int, data: dict, mode: str = "merge") -> dict[str, Any]:
-    """导入 session log。mode: restore（覆盖恢复）/ merge（合并追加）。"""
-    if data.get("format") != FORMAT:
-        raise ValueError("不是有效的 IndexNya session log 文件")
+    """导入 session log / 个人配置。mode: restore（覆盖恢复）/ merge（合并追加）。
+
+    兼容两种文件格式：indexnya-sessionlog 与 indexnya-profile（个人配置备份，
+    其 data 部分结构与 session log 相同，缺表按空处理）。
+    """
+    if data.get("format") not in (FORMAT, "indexnya-profile"):
+        raise ValueError("不是有效的 IndexNya session log / 个人配置文件")
     payload = data.get("data") or {}
     if not isinstance(payload, dict):
         raise ValueError("session log 数据格式错误")

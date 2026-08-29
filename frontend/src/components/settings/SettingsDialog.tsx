@@ -1,7 +1,7 @@
 /** 设置弹窗 — 全屏遮罩 + 居中面板，
  *  左侧导航栏（分区列表），右侧 header（关闭按钮）+ 滚动内容区。 */
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, SlidersHorizontal, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type Conversation, type ModelProvider, type Skill } from "@/lib/api";
@@ -584,11 +584,136 @@ function DataSection() {
   const setOpen = useAppStore((s) => s.setSettingsOpen);
   const providers = useAppStore((s) => s.providers);
   const selectedModelKey = useAppStore((s) => s.selectedModelKey);
+  const reasoningEffort = useAppStore((s) => s.reasoningEffort);
+  const themeMode = useAppStore((s) => s.themeMode);
+  const accentColor = useAppStore((s) => s.accentColor);
 
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<"restore" | "merge">("merge");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // 个人配置备份：勾选的导出项
+  const PROFILE_ITEMS = [
+    { key: "models", label: "模型提供商（含 API Key）" },
+    { key: "theme", label: "主题配色" },
+    { key: "effort", label: "推理强度与选中模型" },
+    { key: "practice", label: "错题本" },
+    { key: "chats", label: "对话记录（含探索卡片）" },
+    { key: "literature", label: "文献" },
+    { key: "universe", label: "思维宇宙" },
+  ] as const;
+  const [profileKeys, setProfileKeys] = useState<Set<string>>(new Set(["models", "theme", "effort", "practice"]));
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function toggleProfileKey(key: string) {
+    setProfileKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleExportProfile() {
+    if (profileKeys.size === 0) {
+      alert("请至少勾选一项要导出的内容。");
+      return;
+    }
+    setProfileBusy(true);
+    setProfileMessage(null);
+    try {
+      const preferences: Record<string, any> = {};
+      if (profileKeys.has("models")) {
+        preferences.providers = providers;
+        preferences.selectedModelKey = selectedModelKey;
+      }
+      if (profileKeys.has("theme")) {
+        preferences.themeMode = themeMode;
+        preferences.accentColor = accentColor;
+      }
+      if (profileKeys.has("effort")) preferences.reasoningEffort = reasoningEffort;
+
+      const data: Record<string, any> = {};
+      const wantData = ["practice", "chats", "literature", "universe"].some((k) => profileKeys.has(k));
+      if (wantData) {
+        const full = await api.exportData();
+        if (profileKeys.has("practice")) data.practice_records = full.data.practice_records;
+        if (profileKeys.has("chats")) {
+          data.conversations = full.data.conversations;
+          data.messages = full.data.messages;
+          data.explore_cards = full.data.explore_cards;
+        }
+        if (profileKeys.has("literature")) data.literatures = full.data.literatures;
+        if (profileKeys.has("universe")) data.understandings = full.data.understandings;
+      }
+
+      const profile = {
+        format: "indexnya-profile",
+        version: 1,
+        exported_at: new Date().toISOString(),
+        preferences,
+        data,
+      };
+      const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `indexnya-profile-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setProfileMessage({ ok: true, text: "已导出个人配置备份文件。" });
+    } catch (e: any) {
+      setProfileMessage({ ok: false, text: `导出失败：${e.message}` });
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
+  async function handleImportProfile() {
+    if (!profileFile) {
+      alert("请先选择一个个人配置备份文件（.json）。");
+      return;
+    }
+    setProfileBusy(true);
+    setProfileMessage(null);
+    try {
+      const text = await profileFile.text();
+      const json = JSON.parse(text);
+      if (json.format !== "indexnya-profile") {
+        throw new Error("这不是有效的个人配置备份文件（indexnya-profile）");
+      }
+      // 恢复前端偏好（写入 localStorage）
+      const prefs = json.preferences;
+      if (prefs && typeof prefs === "object") {
+        const patch: Record<string, any> = {};
+        if (Array.isArray(prefs.providers)) patch.providers = prefs.providers;
+        if (typeof prefs.selectedModelKey === "string") patch.selectedModelKey = prefs.selectedModelKey;
+        if (prefs.themeMode) patch.themeMode = prefs.themeMode;
+        if (prefs.accentColor) patch.accentColor = prefs.accentColor;
+        if (prefs.reasoningEffort) patch.reasoningEffort = prefs.reasoningEffort;
+        if (Object.keys(patch).length > 0) useAppStore.setState(patch);
+      }
+      // 恢复后端数据（合并追加）
+      const hasData = json.data && typeof json.data === "object" && Object.values(json.data).some((v: any) => Array.isArray(v) && v.length > 0);
+      if (hasData) {
+        const result = await api.importData(profileFile, "merge");
+        setProfileMessage({ ok: true, text: `已导入个人配置${result.message ? "：" + result.message : ""}` });
+      } else {
+        setProfileMessage({ ok: true, text: "已导入个人配置（偏好设置已恢复）。" });
+      }
+      bumpConversations(); bumpCards(); bumpLiteratures(); bumpUniverse(); bumpPractice();
+      setProfileFile(null);
+    } catch (e: any) {
+      setProfileMessage({ ok: false, text: e.message });
+    } finally {
+      setProfileBusy(false);
+    }
+  }
 
   // 导出对话为笔记 / 导图
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -839,6 +964,47 @@ function DataSection() {
         <div className="flex justify-end">
           <Button type="button" variant="accent" onClick={handleExportNotes} disabled={noteBusy || selectedIds.size === 0}>
             <Download size={15} /> {noteBusy ? "导出中…" : "导出笔记 / 导图"}
+          </Button>
+        </div>
+      </div>
+
+      {/* 个人配置备份 */}
+      <div className="flex flex-col gap-3 rounded-[16px] border-2 border-island-border bg-island-card/70 p-4">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={15} className="text-island-accentDeep" />
+          <h3 className="text-sm font-extrabold text-island-ink">个人配置备份</h3>
+        </div>
+        <p className="text-xs leading-5 text-island-muted">勾选要备份的内容，导出为 JSON 文件；导入时偏好设置（模型/主题/推理强度）直接恢复，数据部分合并追加。</p>
+
+        {/* 勾选项 */}
+        <div className="grid grid-cols-2 gap-1.5">
+          {PROFILE_ITEMS.map((item) => (
+            <label key={item.key} className="flex cursor-pointer items-center gap-2 rounded-[10px] px-2 py-1.5 hover:bg-island-panel">
+              <input type="checkbox" checked={profileKeys.has(item.key)} onChange={() => toggleProfileKey(item.key)} className="accent-[var(--island-accent)]" />
+              <span className="text-xs text-island-ink">{item.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] leading-4 text-island-muted">提示：模型提供商包含 API Key，导出文件含敏感信息，请勿外传。</p>
+
+        {/* 导入文件选择 */}
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-island-borderStrong/50 bg-island-card/70 px-3 py-3 text-sm font-semibold text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep">
+          <Upload size={15} /> {profileFile ? profileFile.name : "选择个人配置备份文件（.json）"}
+          <input type="file" accept=".json,application/json" className="hidden" onChange={(e) => { setProfileFile(e.target.files?.[0] ?? null); setProfileMessage(null); }} />
+        </label>
+
+        {profileMessage && (
+          <div className={cn("rounded-[14px] px-3 py-2 text-xs font-semibold", profileMessage.ok ? "bg-island-success/10 text-island-success" : "bg-island-error/10 text-island-error")}>
+            {profileMessage.text}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="default" onClick={handleImportProfile} disabled={profileBusy || !profileFile}>
+            <Upload size={15} /> {profileBusy ? "导入中…" : "导入配置"}
+          </Button>
+          <Button type="button" variant="accent" onClick={handleExportProfile} disabled={profileBusy || profileKeys.size === 0}>
+            <Download size={15} /> {profileBusy ? "导出中…" : "导出配置"}
           </Button>
         </div>
       </div>
