@@ -39,7 +39,9 @@ async def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)) -> d
     if not verdict.get("approved"):
         return {"approved": False, "score": verdict.get("score", 0), "feedback": verdict.get("feedback", ""), "missing": verdict.get("missing", []), "understanding": None}
 
-    u = create_or_update_understanding(db, payload.student_id, concept, summary, verdict)
+    from ..services.student_service import get_local_student_id
+
+    u = create_or_update_understanding(db, get_local_student_id(db), concept, summary, verdict)
     return {
         "approved": True,
         "score": verdict.get("score", 0),
