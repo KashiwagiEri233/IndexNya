@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "description": "Index 学习岛：单进程 TypeScript 全栈学习工具",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "node --experimental-strip-types src/runtime/dev.ts",

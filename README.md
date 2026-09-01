@@ -158,3 +158,7 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+## 开源协议
+
+本项目基于 [GNU General Public License v3.0 (GPLv3)](./LICENSE) 协议开源。
