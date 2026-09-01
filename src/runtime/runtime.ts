@@ -15,6 +15,7 @@ export interface RuntimeOptions {
   dev?: boolean;
   vite?: any;
   database?: Database;
+  staticDir?: string;
 }
 
 function contentType(file: string): string {
@@ -88,7 +89,7 @@ async function writeStream(response: ServerResponse, apiResponse: ApiResponse): 
   }
 }
 
-async function serveStatic(request: IncomingMessage, response: ServerResponse, requestPath: string, dev: boolean, vite: any): Promise<void> {
+async function serveStatic(request: IncomingMessage, response: ServerResponse, requestPath: string, dev: boolean, vite: any, staticDir?: string): Promise<void> {
   if (dev && vite) {
     await new Promise<void>((resolve, reject) => {
       vite.middlewares(request, response, (error: unknown) => {
@@ -98,7 +99,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, r
     });
     return;
   }
-  const root = path.join(projectRoot(), "dist");
+  const root = staticDir ? path.resolve(staticDir) : (process.env.INDEXNYA_STATIC_DIR ? path.resolve(process.env.INDEXNYA_STATIC_DIR) : path.join(projectRoot(), "dist"));
   let relative = decodeURIComponent(requestPath.split("?")[0] || "/");
   if (relative === "/") relative = "/index.html";
   const candidate = path.resolve(root, `.${relative}`);
@@ -123,7 +124,7 @@ export function createRuntimeServer(options: RuntimeOptions = {}): { server: htt
         else writeText(response, apiResponse);
         return;
       }
-      if (request.method === "GET" || request.method === "HEAD") { await serveStatic(request, response, url.pathname, Boolean(options.dev), options.vite); return; }
+      if (request.method === "GET" || request.method === "HEAD") { await serveStatic(request, response, url.pathname, Boolean(options.dev), options.vite, options.staticDir); return; }
       response.writeHead(405, { ...corsHeaders(), "Content-Type": "text/plain; charset=utf-8" }); response.end("method not allowed");
     } catch (error) {
       const status = isHttpError(error) ? error.status : 500;

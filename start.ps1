@@ -5,10 +5,12 @@
 
   用法：
     .\start.ps1
+    .\start.ps1 -Desktop
     .\start.ps1 -Port 5174
     .\start.ps1 -Refresh
 #>
 param(
+  [switch]$Desktop,
   [switch]$Refresh,
   [switch]$SkipInstall,
   [int]$Port = 5173,
@@ -43,7 +45,14 @@ if ($Refresh -or -not (Test-Path (Join-Path $ProjectDir "node_modules"))) {
 }
 
 $env:PORT = "$Port"
-Write-Host "=== 启动 Index 学习岛 TS 全栈服务 ===" -ForegroundColor Cyan
-Write-Host "页面与 API：http://localhost:$Port"
 Push-Location $ProjectDir
-try { & npm run dev } finally { Pop-Location }
+try {
+  if ($Desktop) {
+    Write-Host "=== 启动 Index 学习岛 Electron 桌面端 ===" -ForegroundColor Cyan
+    & npm run dev:desktop
+  } else {
+    Write-Host "=== 启动 Index 学习岛 TS 全栈服务 (Web 模式) ===" -ForegroundColor Cyan
+    Write-Host "页面与 API：http://localhost:$Port"
+    & npm run dev
+  }
+} finally { Pop-Location }

@@ -23,6 +23,7 @@
 - **运行环境**：Node.js >= **22.5.0**（利用原生 `node:sqlite` 与 `--experimental-strip-types` 原生 TS 执行能力）
 - **前端技术**：React 18 · TypeScript · Vite 5 · Tailwind CSS · Zustand · react-force-graph-3d · KaTeX · Mermaid
 - **服务端技术**：Node.js 原生 HTTP & SSE · 原生 `node:sqlite` · esbuild 打包 · 原生 `node:test` 测试套件
+- **桌面端技术**：Electron · Context Isolation · Preload 安全桥接 · electron-builder 跨平台打包
 - **模型支持**：任意 OpenAI 兼容端点（Base URL + API Key + Model Name，由前端 LocalStorage 持久化，随请求透传）
 
 ---
@@ -32,6 +33,10 @@
 ```text
 IndexNya/
 ├── src/                          # 统一应用源码目录
+│   ├── electron/                 # Electron 桌面端主进程与 Preload
+│   │   ├── main.ts               # 桌面主进程入口、窗口与内嵌服务编排
+│   │   ├── preload.ts            # 安全上下文隔离桥接
+│   │   └── types.ts              # IPC 与平台 API 类型定义
 │   ├── components/               # React UI 组件
 │   │   ├── chat/                 # 对话气泡、Markdown 渲染、模型/推理强度选择器
 │   │   ├── explore/              # 探索卡片坞（ExploreDock / ExploreCard）
@@ -74,6 +79,8 @@ IndexNya/
 │   └── skills/                   # 用户上传安装的自定义技能
 ├── .github/workflows/ci.yml      # CI 工作流（Install, build & typecheck）
 ├── package.json                  # 项目统一依赖与 npm 脚本
+├── electron-builder.json         # 桌面端打包与分发配置
+├── tsconfig.electron.json        # Electron TypeScript 编译配置
 ├── tsconfig.json                 # 客户端 TypeScript 配置
 ├── tsconfig.server.json          # 服务端 TypeScript 配置
 ├── vite.config.ts                # Vite 配置
@@ -116,17 +123,25 @@ npm install
 # 2. 启动开发模式（单进程：Vite HMR + 同源 /api）
 npm run dev
 
-# 3. 静态类型检查（前端与服务端）
+# 3. 启动桌面端开发调试（Electron + Vite HMR）
+npm run dev:desktop
+
+# 4. 静态类型检查（前端、服务端与 Electron）
 npm run typecheck
 
-# 4. 执行自动化测试
+# 5. 执行自动化测试
 npm run test
 
-# 5. 生产构建（前端 Vite + 服务端 esbuild 单文件打包）
+# 6. 生产构建（前端 Vite + 服务端 esbuild + Electron 主进程）
 npm run build
+npm run build:desktop
 
-# 6. 生产运行
+# 7. 生产运行
 npm run start
+npm run start:desktop
+
+# 8. 桌面端跨平台打包分发
+npm run dist:desktop
 ```
 
 ---

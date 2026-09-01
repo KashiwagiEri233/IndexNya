@@ -3,8 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const require = createRequire(import.meta.url);
-
 interface StatementLike {
   run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint };
   get<T = Record<string, unknown>>(...params: unknown[]): T | undefined;
@@ -24,8 +22,14 @@ interface DatabaseSyncConstructor {
 /** Load node:sqlite lazily so type-checking also works with older @types/node packages. */
 function loadDatabaseSync(): DatabaseSyncConstructor {
   try {
-    const mod = require("node:sqlite") as { DatabaseSync?: DatabaseSyncConstructor };
-    if (!mod.DatabaseSync) throw new Error("DatabaseSync is not available");
+    let mod: { DatabaseSync?: DatabaseSyncConstructor } | undefined;
+    if (typeof require !== "undefined") {
+      mod = require("node:sqlite") as { DatabaseSync?: DatabaseSyncConstructor };
+    } else {
+      const nodeRequire = createRequire(import.meta.url);
+      mod = nodeRequire("node:sqlite") as { DatabaseSync?: DatabaseSyncConstructor };
+    }
+    if (!mod?.DatabaseSync) throw new Error("DatabaseSync is not available");
     return mod.DatabaseSync;
   } catch (error) {
     throw new Error(
@@ -68,11 +72,25 @@ export function toNumber(value: unknown, fallback = 0): number {
 }
 
 export function projectRoot(): string {
-  const candidates = [process.cwd(), path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."), path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")];
+  let currentDir = process.cwd();
+  try {
+    if (typeof __dirname !== "undefined") {
+      currentDir = __dirname;
+    } else if (typeof import.meta !== "undefined" && import.meta.url) {
+      currentDir = path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {}
+  const candidates = [process.cwd(), path.resolve(currentDir, "../.."), path.resolve(currentDir, "..")];
   return candidates.find((candidate) => fs.existsSync(path.join(candidate, "package.json"))) || candidates[0];
 }
 
 export function defaultDatabasePath(root = projectRoot()): string {
+  const configuredDataDir = process.env.INDEXNYA_DATA_DIR?.trim();
+  if (configuredDataDir) {
+    const configuredDb = process.env.INDEXNYA_DB_PATH?.trim();
+    return configuredDb ? path.resolve(configuredDataDir, configuredDb) : path.join(path.resolve(configuredDataDir), "learning_agent.db");
+  }
+
   const configured = process.env.INDEXNYA_DB_PATH?.trim();
   if (configured) return path.resolve(root, configured);
 

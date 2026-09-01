@@ -32,4 +32,4 @@ jobs:
         run: npm run test
 
       - name: Build frontend and server
-        run: npm run build
+        run: npm run build:desktop
