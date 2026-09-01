@@ -1,113 +1,164 @@
 # Index 学习岛
 
 > 面向大学生的本地单用户学习工具（数据全部保存在本机，不区分多用户）
-> 技术栈：React + FastAPI
+> **技术栈：React + TypeScript 全栈（Node.js）**
 
 ## 功能
 
 1. **学习对话与记录** — 通过对话梳理专业方向、学习目标和当前难点，自动记录完整学习过程
 2. **学习资料整理** — 生成讲解文档、思维导图、拓展阅读、代码案例；需要视频时提供 Bilibili 相关视频链接
-3. **互动刷题** — 通过 agent 工具（`ask_question`）一题一题地给学生出练习题：出题 → 作答 → 即时批改讲解 → 下一题；支持选择题点选与自由作答，可随时结束并汇总正确率
+3. **互动刷题** — 通过 `ask_question` 工具一题一题地给学生出练习题：出题 → 作答 → 即时批改讲解 → 下一题；支持选择题点选与自由作答，可随时结束并汇总正确率
 4. **错题本** — 互动刷题中出过的题目自动入库（题目/选项/答案/解析/对错），可在「错题本」页筛选查看、删除，并可一键「重练错题」回到对话页逐题重做
-5. **技能系统** — 技能以 Markdown 指令文件存储（`backend/app/skills/*.md`），在「设置」页可随时**安装、卸载、开启/关闭**（全局开关）；已开启的技能会被 agent 当作工具（`use_skill`）在对话中主动调用，也可在对话页快捷栏点选，或通过自然语言自动路由。安装即生效，无需重启
-6. **层级对话（哪里不懂点哪里）** — 点击回答/文献中的术语，卡片在主线旁丝滑展开：
-   - ↗️ **子卡片**：深挖背景知识；➡️ **关联卡片**：横向对比发散；⬇️ **分支卡片**：继承上下文另起炉灶
-   - 可无限下钻（卡片树持久化，侧边栏随时重开、旧回答不丢失），主线始终清晰可见
-   - 支持**选中任意文本追问/引用**，不限于预标注术语；支持导入 **PDF / TXT / Markdown 文献**，正文术语高亮可点
-7. **思维宇宙** — 用自己的话总结概念，AI 评审认可后存入个人理解库；所有理解以 **3D 知识网络**呈现，讲解新概念时自动调用你已掌握的理解作为**知识锚点**
+5. **技能系统** — 技能以 Markdown 指令文件存储（`src/runtime/skills/*/SKILL.md`），在「设置」页可随时安装、卸载、开启/关闭；已开启的技能会被 agent 当作工具（`use_skill`）在对话中主动调用
+6. **层级对话（哪里不懂点哪里）** — 点击回答/文献中的术语，卡片在主线旁丝滑展开：子卡片、关联卡片、分支卡片；卡片树持久化，支持选中文本追问/引用以及导入 PDF / TXT / Markdown 文献
+7. **思维宇宙** — 用自己的话总结概念，AI 评审认可后存入个人理解库；所有理解以 3D 知识网络呈现，讲解新概念时自动调用已掌握的理解作为知识锚点
 8. **多种答疑方式** — 支持文字、图片（上传题目/图表，由多模态模型直接识别解答），并可推荐 Bilibili 相关视频
 9. **消息编辑 / 删除 / 引用** — 修改自己的提问、整轮删除（级联清理其探索卡片）、选中文本作为引用随问题发送
-10. **外观主题** — 支持浅色 / 深色 / 跟随系统三档模式；可自定义「主界面颜色」：输入 16 进制色号、从预设色卡点选，或用原生取色器任意取色。主色全局联动到按钮、输入框、选中态等控件，同时背景、卡片、面板、文字、描边、聊天气泡整体随主色一起变色（浅色 / 深色各自动生成可读版本）；设置自动保存、刷新不丢。入口在左下角「设置 → 外观」
-11. **数据备份 / 恢复与导出** — 左下角「设置 → 数据」提供：
-    - **session log 全量备份 / 恢复**：对话、消息、探索卡片树、文献、思维宇宙、错题本一键导出为 JSON；导入支持「合并追加」或「覆盖恢复」（保留原始 ID 与层级关系，可完美还原聊天记录）
-    - **导出对话为笔记 / 思维导图**：勾选若干对话，导出为 Markdown 笔记 + mermaid 思维导图（支持 Typora / Obsidian 等渲染成图），可选「直接整理」或「AI 提炼」两种生成方式
-    - **个人配置备份**：勾选导出模型提供商（含 API Key）、主题配色、推理强度、错题本、对话记录、文献、思维宇宙等；导入时偏好设置直接恢复、数据部分合并追加
+10. **外观主题** — 支持浅色 / 深色 / 跟随系统三档模式；可自定义主色，设置自动保存
+11. **数据备份 / 恢复与导出** — 支持 session log 全量备份/恢复、对话导出为 Markdown 笔记 + Mermaid 思维导图、个人配置备份
 
 ## 技术栈
 
-- **后端**：Python 3.12 · FastAPI · SQLAlchemy 2 · SQLite · pypdf（文献解析）
-- **前端**：Vite · React 18 · TypeScript · Tailwind · react-force-graph-3d（思维宇宙 3D 图）
-- **模型接口**：支持任意 OpenAI 兼容模型，前端可自行添加和切换；图片理解直接复用文本模型的多模态能力（模型需支持 vision 输入），无需单独配置图片服务
+- **全栈运行时**：Node.js 22.5+ · TypeScript · 原生 `node:sqlite` · Node 原生 HTTP / SSE
+- **页面层**：Vite · React 18 · TypeScript · Tailwind · react-force-graph-3d
+- **模型接口**：任意 OpenAI 兼容模型（模型配置保存在浏览器本地存储，请求时通过同源 API 发送）
+- **文献与技能**：Node `Request.formData()` 处理上传；内置轻量 PDF 文本兜底解析；ZIP 技能包由 TypeScript 安全解压
+
+> 页面与 API 由同一个 Node.js 进程提供：开发时由 `src/runtime/dev.ts` 挂载 Vite middleware，生产时由 `src/runtime/index.ts` 直接托管 `dist`。完全移除 Python/FastAPI 后端依赖。
 
 ## 快速开始
 
-### 1. 配置模型
+### 环境要求
 
-模型在网页左下角「设置」中配置（添加提供商 + 提供商内选模型），**无需填写任何环境变量 / .env**。
+- Node.js **22.5+**（推荐 24+；运行时使用 `node:sqlite`）
+- npm 10+
+- 如需调用 AI：一个 OpenAI 兼容模型的 Base URL、API Key 与模型名
 
-### 2. 后端
-
-```bash
-cd backend
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e .        # 或 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-### 3. 前端
+### 开发模式（单进程）
 
 ```bash
-cd frontend
+# 在项目根目录执行
 npm install
 npm run dev
 ```
 
-打开 http://localhost:5173 即可使用。
+或使用一键脚本：
 
-### Windows 一键启动（PowerShell）
-
-```powershell
-cd D:\git\IndexNya
-.\start.ps1          # 首次自动建虚拟环境、装依赖，然后同时拉起前后端
-.\start.ps1 -Refresh # 强制重新安装后端依赖
+```bash
+./start.sh                 # macOS / Linux / Git Bash
+.\start.ps1                # Windows PowerShell
+.\start.ps1 -Port 5174    # 自定义端口
 ```
 
-- 需要已安装 **Python 3.12+** 与 **Node.js 18+**（均已加入 PATH）
-- 模型在网页左下角「设置」中添加提供商并选择模型，无需 .env
-- 按 `Ctrl+C` 退出，脚本会自动关闭前后端进程
-- 自定义端口：`.\start.ps1 -BackendPort 8001 -FrontendPort 5174`
+打开 <http://localhost:5173>。页面与 API 共用同源地址，API 入口为 `/api`，不再有单独的 `localhost:8000` 服务。
 
-> `start.sh` 为 Linux/macOS（或 Git Bash）下的一键脚本；Windows 请使用上面的 `start.ps1`。
+### 构建与生产运行
 
-## 架构
-
-```
-后端 agents/        — 讲解、导图、阅读、代码、辅导、术语抽取（terms.py）
-后端 routers/       — chat / tutoring / skills（安装/开关） / practice（错题本） /
-                       hierarchy（探索卡片 SSE）/ literature（文献）/ universe（思维宇宙）
-后端 services/      — 资源生成、分支对话、互动刷题、本地单用户（student_service）、思维宇宙（嵌入/锚点/图）
-后端 skills/        — Markdown 技能文件（backend/app/skills/*.md）+ 全局开关 settings.json
-后端 llm/           — OpenAI 兼容接口封装，按配置切换模型；图片理解复用多模态能力
-前端 pages/         — Chat / Practice（错题本） / Literature / Universe / Settings
-前端 components/    — explore（探索卡片坞：拖动/缩放/提问编辑态/卡片树）
-前端 stores/        — zustand 全局状态（对话、模型、探索卡片坞）
+```bash
+npm run build
+PORT=4173 npm run start       # macOS / Linux
+# PowerShell：$env:PORT=4173; npm run start
 ```
 
-## 请求处理时序（低等待设计）
+构建会完成两步：
 
-对话流先「确定需求」再「调用功能 prompt」，尽量少调模型：
+1. 根目录 `src` 的 TypeScript 类型检查与 Vite 静态资源构建；
+2. 使用 esbuild 将 `src/runtime/index.ts` 打包到 `dist-server/index.js`。
 
-1. **阶段A 确定需求**（递进，命中即止）：显式指定（resource_type / skill / 刷题模式）→ 本地关键词快速路由（讲解文档/思维导图/互动刷题等常见请求，零 LLM 调用）→ 未命中才走一次轻量意图判定 LLM（小 prompt、只输出一个小 JSON）。
-2. **阶段B 调用功能 prompt**：需求确定后才注入对应功能的提示词——资源 agent 的 system prompt、技能 .md 指令、互动刷题（`ask_question` 工具逐题提问）、辅导/对话 prompt；tasks/acceptance 由本地模板生成，不再经 LLM。
-3. **流式输出**：内容流结束后立即保存消息并发 `done`（前端光标即刻停止），验收 / 术语抽取在后台并行执行，完成后回填消息 meta 并发出对应 SSE 事件。
+生产模式只启动一个 Node 进程，同时提供静态页面、JSON API、multipart 上传和 SSE 流。
 
-互动刷题会话状态（进行到第几题、答对几题、每题答案与解析）持久化在消息 meta 的 `quiz_session` 字段中：同一对话里用户作答后，下一轮自动继续该会话，无需额外接口。
+### 数据迁移
+
+应用数据自动保存在本地 SQLite 文件中：
+- 默认路径：`data/learning_agent.db`
+- 自定义路径：可通过环境变量 `INDEXNYA_DB_PATH` 配置
+
+## 目录结构
+
+```text
+IndexNya/
+├── src/                       # 统一应用源码（页面、领域逻辑、运行时）
+│   ├── components/            # 布局、设置、探索卡片、Markdown
+│   ├── pages/                 # Chat / Practice / Literature / Universe
+│   ├── stores/                # Zustand 本地状态
+│   ├── lib/api.ts             # 同源 fetch + SSE 客户端
+│   └── runtime/               # TypeScript 全栈运行时，不是独立的前后端项目
+│       ├── index.ts           # 生产入口
+│       ├── dev.ts             # Vite middleware + API 单进程入口
+│       ├── runtime.ts         # Node HTTP、静态托管、SSE、错误处理
+│       ├── api.ts             # REST 路由与 multipart 入口
+│       ├── db.ts              # node:sqlite schema、迁移、事务
+│       ├── repository.ts      # SQLite 查询与领域数据映射
+│       ├── llm.ts             # OpenAI 兼容接口、流式输出、工具调用
+│       ├── chat.ts            # 路由、对话流、技能与互动刷题
+│       ├── hierarchy.ts       # 探索卡片 SSE 与卡片树
+│       ├── agents.ts          # 资源、辅导、术语抽取、思维导图
+│       ├── universe.ts        # 本地向量、锚点、知识图谱
+│       ├── literature.ts      # PDF/TXT/Markdown 解析
+│       ├── skills.ts          # Markdown 技能与 ZIP 安装
+│       ├── data.ts             # session log 与笔记导出
+│       └── tests/              # 服务端单元测试
+├── public/                    # 页面静态资源
+├── scripts/build-server.mjs   # esbuild 服务端打包脚本
+├── tsconfig.json              # 页面 TypeScript 配置
+├── tsconfig.server.json       # 运行时 TypeScript 配置
+├── package.json               # 统一依赖与脚本
+├── data/                      # 运行时数据（自动生成，已加入 gitignore）
+```
+
+## 请求处理时序
+
+1. 页面通过同源 `/api` 发起请求；普通数据使用 JSON，长任务使用 SSE。
+2. `src/runtime/api.ts` 解析请求并交给领域模块，`src/runtime/db.ts` 使用同步 SQLite 查询，避免额外 ORM 运行时。
+3. 对话先经过本地关键词路由，必要时再调用轻量意图判定；资源、辅导、技能和刷题分别执行专用 prompt。
+4. 模型文本边生成边写入 SSE；消息落库后发送 `done`，术语和验收信息随后补发。
+5. 生产构建后的静态页面与 API 由同一个 `src/runtime/index.ts` 进程托管。
+
+## API 能力
+
+保留原有页面契约，迁移后仍支持：
+
+- `/api/chat`、`/api/models/test`
+- `/api/conversations/*`、`/api/messages/*`
+- `/api/resources/*`、`/api/tutor/ask`
+- `/api/hierarchy/*`、`/api/practice/*`
+- `/api/literature/*`、`/api/image/understand`
+- `/api/universe/*`、`/api/skills/*`
+- `/api/data/export`、`/api/data/import`、`/api/data/export-notes`
+
+## 模型配置
+
+模型在网页左下角「设置」中配置，保存在浏览器 localStorage，不需要 `.env`。支持多个 OpenAI 兼容提供商和模型；图片理解会复用当前选中的模型，因此需要选择支持 vision 输入的模型。
 
 ## 扩展技能
 
-两种方式任选：
+### 设置页安装（推荐）
 
-1. **设置页安装（推荐）**：打开「设置 → 技能管理」，填写名称/标题/描述/指令正文并保存，立即可用；
-2. **直接放文件**：在 `backend/app/skills/` 下新建一个 Markdown 文件（支持 frontmatter）：
+打开「设置 → 技能管理」，上传包含 `SKILL.md` 的 `.zip` 技能包。压缩包可以直接包含 `SKILL.md`，也可以包含一个或多个技能文件夹。安装、开关和卸载立即生效，无需重启。
+
+### 直接添加内置技能
+
+内置技能位于 `src/runtime/skills/<name>/SKILL.md`，格式示例：
 
 ```markdown
 ---
-name: my_skill            # 技能唯一标识（英文短横线）
-title: 我的技能            # 展示名称
-description: 一句话说明    # 主 Agent 据此判断何时使用
+name: my_skill
+title: 我的技能
+description: 一句话说明何时使用
 ---
-这里是技能的完整执行指令，会注入模型上下文，由模型按指令执行。
+这里是完整执行指令，模型加载后会严格遵守。
 ```
 
-技能安装即生效（无需重启后端）；在设置页可以随时卸载，或用开关控制是否被 agent 与对话页快捷栏使用。
+运行时技能状态保存在 `data/skills.json`，用户安装的技能保存在 `data/skills/`，不会修改源码目录。
+
+## 测试与检查
+
+```bash
+npm run typecheck
+npm run test
+npm run build
+```
+
+## 开源协议
+
+本项目基于 [GNU General Public License v3.0 (GPLv3)](./LICENSE) 协议开源。

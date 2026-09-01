@@ -1,32 +1,24 @@
 #!/usr/bin/env bash
-# 一键启动 Index 学习岛（前后端）
-set -e
+# 一键启动 Index 学习岛（单进程 TypeScript 全栈）
+set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-echo "=== 启动后端 (FastAPI :8000) ==="
-cd "$ROOT/backend"
-if [ ! -d .venv ]; then
-  echo "首次运行：创建虚拟环境"
-  python3.14 -m venv .venv 2>/dev/null || python3.12 -m venv .venv || python3 -m venv .venv
-  .venv/bin/pip install --upgrade pip -q
-  .venv/bin/pip install -e . -q
-fi
-.venv/bin/uvicorn app.main:app --reload --port 8000 &
-BACKEND_PID=$!
-echo "后端 PID: $BACKEND_PID"
+cd "$ROOT"
 
-echo "=== 启动前端 (Vite :5173) ==="
-cd "$ROOT/frontend"
-if [ ! -d node_modules ]; then
-  npm install
+if ! command -v node >/dev/null 2>&1; then
+  echo "未找到 Node.js，请安装 Node.js 22.5+。" >&2
+  exit 1
 fi
-npm run dev &
-FRONTEND_PID=$!
-echo "前端 PID: $FRONTEND_PID"
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "Index 学习岛需要 Node.js 22.5+（当前：$(node -v)）。" >&2
+  exit 1
+fi
 
-trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT
-echo ""
-echo "✅ 启动完成："
-echo "   前端: http://localhost:5173"
-echo "   后端: http://localhost:8000/docs"
-echo "   按 Ctrl+C 退出"
-wait
+if [ ! -d "$ROOT/node_modules" ]; then
+  echo "首次运行：安装前端与全栈依赖…"
+  npm --prefix "$ROOT" install
+fi
+
+echo "=== 启动 Index 学习岛 TS 全栈服务 ==="
+echo "API 与前端由同一个 Node.js 进程提供，默认地址：http://localhost:5173"
+exec npm --prefix "$ROOT" run dev

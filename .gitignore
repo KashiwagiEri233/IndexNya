@@ -8,12 +8,16 @@ __pycache__/
 venv/
 *.db
 *.db-journal
-backend/uploads/
-backend/outputs/
-backend/app/skills/settings.json
 node_modules/
 dist/
 .DS_Store
 *.log
 .vscode/
 .idea/
+# TypeScript full-stack runtime
+data/
+dist-server/
+src/runtime/skills/*.json
+*.db-wal
+*.db-shm
+*.tsbuildinfo
