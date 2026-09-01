@@ -1,12 +1,47 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** animal-island-ui 卡片：20px 圆角、无 box-shadow，仅 hover 上浮 2px。 */
+export type CardColor =
+  | "default"
+  | "app-pink"
+  | "purple"
+  | "app-blue"
+  | "app-yellow"
+  | "app-orange"
+  | "app-teal"
+  | "app-green"
+  | "app-red"
+  | "lime-green"
+  | "yellow-green"
+  | "brown"
+  | "warm-peach-pink";
+
+export type CardPattern = "none" | CardColor;
+
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  color?: CardColor;
+  pattern?: CardPattern;
+  hoverable?: boolean;
+  dashed?: boolean;
+}
+
+/** animal-island-ui 规范卡片：20px 圆角、无浮动投影、支持 13 色纯色与双层波点墙纸。 */
 export const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("card", className)} {...props} />
+  CardProps
+>(({ className, color = "default", pattern = "none", hoverable = false, dashed = false, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "card",
+      dashed && "card-dashed",
+      hoverable && "card-hoverable",
+      color !== "default" && `card-${color}`,
+      pattern !== "none" && `pattern-${pattern}`,
+      className
+    )}
+    {...props}
+  />
 ));
 Card.displayName = "Card";
 

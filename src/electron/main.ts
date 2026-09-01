@@ -69,6 +69,7 @@ function createWindow(url: string): void {
     path.join(appPath, "public", "favicon.svg"),
   ];
   const iconPath = iconCandidates.find((p) => fs.existsSync(p));
+  const isMac = process.platform === "darwin";
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -77,7 +78,16 @@ function createWindow(url: string): void {
     minHeight: 640,
     title: "Index 学习岛",
     show: false,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f8f8f0",
+    titleBarStyle: isMac ? "hiddenInset" : "hidden",
+    trafficLightPosition: isMac ? { x: 18, y: 18 } : undefined,
+    titleBarOverlay: !isMac
+      ? {
+          color: "#f8f8f0",
+          symbolColor: "#794f27",
+          height: 38,
+        }
+      : false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -114,6 +124,7 @@ function createWindow(url: string): void {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    app.quit();
   });
 }
 
@@ -121,6 +132,29 @@ ipcMain.handle("get-app-version", () => app.getVersion());
 ipcMain.handle("open-external", async (_, targetUrl: unknown) => {
   if (typeof targetUrl === "string" && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
     await shell.openExternal(targetUrl);
+  }
+});
+ipcMain.handle("update-theme", (_, payload: unknown) => {
+  if (!mainWindow || typeof payload !== "object" || !payload) return;
+  const { backgroundColor, symbolColor } = payload as {
+    backgroundColor?: string;
+    symbolColor?: string;
+    mode?: "light" | "dark";
+    accentColor?: string;
+  };
+  if (backgroundColor) {
+    try {
+      mainWindow.setBackgroundColor(backgroundColor);
+    } catch {}
+  }
+  if (process.platform !== "darwin" && typeof (mainWindow as any).setTitleBarOverlay === "function" && backgroundColor && symbolColor) {
+    try {
+      (mainWindow as any).setTitleBarOverlay({
+        color: backgroundColor,
+        symbolColor: symbolColor,
+        height: 38,
+      });
+    } catch {}
   }
 });
 
@@ -142,9 +176,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  app.quit();
 });
 
 app.on("activate", () => {

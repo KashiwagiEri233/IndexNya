@@ -1,10 +1,28 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const devPort = Number(process.env.PORT || 5173);
+
+async function findAvailablePort(startPort, host = "127.0.0.1") {
+  for (let p = startPort; p < startPort + 50; p++) {
+    const isFree = await new Promise((resolve) => {
+      const tester = net.createServer()
+        .once("error", () => resolve(false))
+        .once("listening", () => {
+          tester.close(() => resolve(true));
+        })
+        .listen(p, host);
+    });
+    if (isFree) return p;
+  }
+  return startPort;
+}
+
+const requestedPort = Number(process.env.PORT || 5173);
+const devPort = await findAvailablePort(requestedPort);
 const devUrl = `http://127.0.0.1:${devPort}`;
 
 console.log("正在编译 Electron 主进程与 Preload 脚本...");
