@@ -64,7 +64,17 @@ function modelFrom(value: unknown): ModelConfig | undefined {
   if (!value || typeof value !== "object") return undefined;
   const input = value as Record<string, unknown>;
   if (!input.model) return undefined;
-  return { id: input.id ? String(input.id) : undefined, name: input.name ? String(input.name) : undefined, type: input.type ? String(input.type) : undefined, model: String(input.model), base_url: input.base_url ? String(input.base_url) : undefined, api_key: input.api_key ? String(input.api_key) : undefined, reasoning_effort: input.reasoning_effort ? String(input.reasoning_effort) : undefined };
+  return {
+    id: input.id ? String(input.id) : undefined,
+    name: input.name ? String(input.name) : undefined,
+    type: input.type ? String(input.type) : undefined,
+    model: String(input.model),
+    base_url: input.base_url ? String(input.base_url) : undefined,
+    api_key: input.api_key ? String(input.api_key) : undefined,
+    reasoning_effort: input.reasoning_effort ? String(input.reasoning_effort) : undefined,
+    protocol: input.protocol ? (String(input.protocol).toLowerCase() as any) : undefined,
+    enable_web_search: typeof input.enable_web_search === "boolean" ? input.enable_web_search : Boolean(input.enableWebSearch),
+  };
 }
 
 async function formData(request: ApiRequest): Promise<FormData> {
@@ -209,8 +219,8 @@ export async function handleApiRequest(request: ApiRequest, db: Database): Promi
   // Image understanding -------------------------------------------------------
   if (parts[0] === "image" && parts[1] === "understand" && method === "POST") {
     const data = await formData(request); const file = data.get("image") as any; if (!file || typeof file.arrayBuffer !== "function") throw new HttpError(400, "请上传图片");
-    const contentType = String(file.type || ""); if (!IMAGE_TYPES.has(contentType)) throw new HttpError(400, `unsupported image type: ${contentType}（仅支持 jpg/png）`);
-    const image = Buffer.from(await file.arrayBuffer()); if (image.length > IMAGE_MAX_SIZE) throw new HttpError(400, `image too large: ${image.length} bytes (max 4MB)`);
+    const contentType = String(file.type || ""); if (!IMAGE_TYPES.has(contentType)) throw new HttpError(400, `unsupported image type: ${contentType}（支持 jpg/png/webp/gif）`);
+    const image = Buffer.from(await file.arrayBuffer()); if (image.length > IMAGE_MAX_SIZE) throw new HttpError(400, `image too large: ${image.length} bytes (max 10MB)`);
     const question = String(data.get("question") || "请描述这张图片并解释相关知识点");
     let model: ModelConfig | undefined; const rawModel = data.get("model"); if (rawModel) { try { model = modelFrom(JSON.parse(String(rawModel))); } catch { /* optional */ } }
     return ok(await understandImage(image, question, contentType, model));

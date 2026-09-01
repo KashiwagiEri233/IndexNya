@@ -5,6 +5,13 @@ import { handleApiRequest } from "../api.ts";
 import { chunkText } from "../literature.ts";
 import { gradeAnswer, newSession, applyToolArgs, summaryText } from "../quiz.ts";
 import { cosine, localEmbed } from "../universe.ts";
+import {
+  inferProtocol,
+  endpointUrlForProtocol,
+  parseImageInfo,
+  buildRequestBodyForProtocol,
+  formatCitationsMarkdown,
+} from "../llm.ts";
 
 function request(method: string, pathname: string, value?: unknown) {
   const url = new URL(pathname, "http://indexnya.test");
@@ -81,4 +88,101 @@ test("resource, universe and session-log APIs work without an external model", a
   // call in a separate assertion below; the HTTP endpoint is covered by the
   // browser integration because it intentionally accepts multipart files.
   assert.ok(importRequest.body.length === 0);
+});
+
+test("multimodal payload and protocol inference align across OpenAI, Anthropic, and Responses API", () => {
+  // 1. Protocol inference & URL generation
+  assert.equal(inferProtocol({ model: "deepseek-chat", base_url: "https://api.deepseek.com" }), "openai");
+  assert.equal(inferProtocol({ model: "deepseek-chat", base_url: "https://api.deepseek.com/anthropic" }), "anthropic");
+  assert.equal(inferProtocol({ model: "claude-3-5-sonnet", base_url: "https://api.anthropic.com/v1" }), "anthropic");
+  assert.equal(inferProtocol({ model: "gpt-4o", base_url: "https://api.openai.com/v1", protocol: "responses" }), "responses");
+  assert.equal(inferProtocol({ model: "deepseek-v4-flash", base_url: "https://api.deepseek.com/responses" }), "responses");
+
+  assert.equal(endpointUrlForProtocol({ model: "m", base_url: "https://api.deepseek.com/v1" }, "openai"), "https://api.deepseek.com/v1/chat/completions");
+  assert.equal(endpointUrlForProtocol({ model: "m", base_url: "https://api.anthropic.com/v1" }, "anthropic"), "https://api.anthropic.com/v1/messages");
+  assert.equal(endpointUrlForProtocol({ model: "m", base_url: "https://api.deepseek.com/anthropic" }, "anthropic"), "https://api.deepseek.com/anthropic/v1/messages");
+  assert.equal(endpointUrlForProtocol({ model: "m", base_url: "https://api.openai.com/v1" }, "responses"), "https://api.openai.com/v1/responses");
+
+  // 2. Multimodal image parsing (data URL & Anthropic source)
+  const sampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const parsedFromOpenAi = parseImageInfo({ type: "image_url", image_url: { url: sampleDataUrl } });
+  assert.ok(parsedFromOpenAi);
+  assert.equal(parsedFromOpenAi?.mimeType, "image/png");
+  assert.ok(parsedFromOpenAi?.base64Data.startsWith("iVBOR"));
+
+  const parsedFromAnthropic = parseImageInfo({ type: "image", source: { type: "base64", media_type: "image/webp", data: "UklGR..." } });
+  assert.ok(parsedFromAnthropic);
+  assert.equal(parsedFromAnthropic?.mimeType, "image/webp");
+  assert.equal(parsedFromAnthropic?.base64Data, "UklGR...");
+
+  // 3. Payload generation across protocols
+  const messages = [
+    { role: "system", content: "You are a helpful tutor." },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "请解释这道题" },
+        { type: "image_url", image_url: { url: sampleDataUrl } },
+      ],
+    },
+  ];
+  const tool = {
+    type: "function",
+    function: {
+      name: "use_skill",
+      description: "Use a skill",
+      parameters: { type: "object", properties: { skill: { type: "string" } }, required: ["skill"] },
+    },
+  };
+
+  // 3a. OpenAI body
+  const openAiBody = buildRequestBodyForProtocol({ model: "gpt-4o" }, messages, { tools: [tool] }, "openai", true);
+  assert.equal(openAiBody.model, "gpt-4o");
+  assert.equal(openAiBody.stream, true);
+  const openAiMsgs = openAiBody.messages as any[];
+  assert.equal(openAiMsgs.length, 2);
+  assert.equal(openAiMsgs[0].role, "system");
+  assert.equal(openAiMsgs[1].content[0].type, "text");
+  assert.equal(openAiMsgs[1].content[1].type, "image_url");
+
+  // 3b. Anthropic body
+  const anthropicBody = buildRequestBodyForProtocol({ model: "claude-3-5-sonnet" }, messages, { tools: [tool] }, "anthropic", false);
+  assert.equal(anthropicBody.model, "claude-3-5-sonnet");
+  assert.equal(anthropicBody.system, "You are a helpful tutor.");
+  const anthropicMsgs = anthropicBody.messages as any[];
+  assert.equal(anthropicMsgs.length, 1); // system extracted
+  assert.equal(anthropicMsgs[0].role, "user");
+  assert.equal(anthropicMsgs[0].content[0].type, "image");
+  assert.equal(anthropicMsgs[0].content[0].source.media_type, "image/png");
+  assert.equal(anthropicMsgs[0].content[1].type, "text");
+  const anthropicTools = anthropicBody.tools as any[];
+  assert.equal(anthropicTools[0].name, "use_skill");
+  assert.ok(anthropicTools[0].input_schema);
+
+  // 3c. Responses API body with Web Search
+  const responsesBody = buildRequestBodyForProtocol(
+    { model: "deepseek-v4-flash", enable_web_search: true },
+    messages,
+    { tools: [tool] },
+    "responses",
+    true,
+  );
+  assert.equal(responsesBody.model, "deepseek-v4-flash");
+  assert.equal(responsesBody.instructions, "You are a helpful tutor.");
+  const inputItems = responsesBody.input as any[];
+  assert.equal(inputItems.length, 1);
+  assert.equal(inputItems[0].content[0].type, "input_text");
+  assert.equal(inputItems[0].content[1].type, "input_image");
+  const responsesTools = responsesBody.tools as any[];
+  assert.ok(responsesTools.some((t) => t.type === "web_search"));
+  assert.ok(responsesTools.some((t) => t.type === "function" && t.name === "use_skill"));
+
+  // 4. Citation docs formatting
+  const citations = [
+    { title: "DeepSeek Vision Docs", url: "https://api-docs.deepseek.com/zh-cn/guides/vision" },
+    { title: "Responses API Guide", url: "https://api-docs.deepseek.com/zh-cn/guides/responses_api" },
+  ];
+  const markdown = formatCitationsMarkdown(citations);
+  assert.match(markdown, /参考网络来源与文档/);
+  assert.match(markdown, /\[DeepSeek Vision Docs\]\(https:\/\/api-docs\.deepseek\.com\/zh-cn\/guides\/vision\)/);
 });

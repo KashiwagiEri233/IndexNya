@@ -11,13 +11,21 @@ export interface ModelConfig {
   base_url?: string;
   api_key?: string;
   reasoning_effort?: string;
+  protocol?: "openai" | "anthropic" | "responses";
+  enable_web_search?: boolean;
 }
 
 export type ChatRole = "user" | "assistant" | "system" | "tool";
 
+export type TextPart = { type: "text" | "input_text"; text: string };
+export type ImageUrlPart = { type: "image_url"; image_url: { url: string; detail?: string } };
+export type AnthropicImagePart = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+export type InputImagePart = { type: "input_image"; image_url: string; detail?: string };
+export type MultimodalPart = TextPart | ImageUrlPart | AnthropicImagePart | InputImagePart | JsonObject;
+
 export interface ChatMessage {
   role: ChatRole | string;
-  content: unknown;
+  content: string | MultimodalPart[] | unknown;
   name?: string;
   tool_call_id?: string;
   tool_calls?: unknown[];

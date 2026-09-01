@@ -672,8 +672,8 @@ export default function ChatPage() {
       alert("只能上传图片文件");
       return;
     }
-    if (file.size > 4 * 1024 * 1024) {
-      alert("图片不能超过 4MB");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("图片不能超过 10MB");
       return;
     }
     setPendingImage(file);
@@ -1034,7 +1034,7 @@ export default function ChatPage() {
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/jpg"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];

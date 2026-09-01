@@ -1,7 +1,7 @@
 /** 设置弹窗 — 全屏遮罩 + 居中面板，
  *  左侧导航栏（分区列表），右侧 header（关闭按钮）+ 滚动内容区。 */
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, SlidersHorizontal, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Database, Download, ExternalLink, FileJson, Globe, HelpCircle, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RibbonTitle } from "@/components/ui/ribbon";
@@ -41,7 +41,98 @@ const THEME_MODES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
   { id: "system", label: "跟随系统", icon: Monitor },
 ];
 
-const EMPTY_PROVIDER_FORM = { name: "", baseUrl: "", apiKey: "", testModel: "" };
+export interface ProviderPreset {
+  label: string;
+  name: string;
+  baseUrl: string;
+  protocol: "openai" | "anthropic" | "responses";
+  enableWebSearch: boolean;
+  defaultModel: string;
+  defaultModelName: string;
+  desc: string;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    label: "DeepSeek (Responses API + 联网)",
+    name: "DeepSeek Responses",
+    baseUrl: "https://api.deepseek.com",
+    protocol: "responses",
+    enableWebSearch: true,
+    defaultModel: "deepseek-v4-flash",
+    defaultModelName: "DeepSeek V4 Flash (联网)",
+    desc: "使用 Responses API 格式，支持服务端原生 web_search 深度联网检索与文档来源引用",
+  },
+  {
+    label: "DeepSeek (Anthropic API 格式)",
+    name: "DeepSeek Anthropic",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    protocol: "anthropic",
+    enableWebSearch: false,
+    defaultModel: "deepseek-v4-flash",
+    defaultModelName: "DeepSeek V4 Flash (Anthropic 格式)",
+    desc: "使用 Anthropic Messages API 规范调用 DeepSeek 模型",
+  },
+  {
+    label: "DeepSeek (视觉多模态)",
+    name: "DeepSeek 视觉理解",
+    baseUrl: "https://api.deepseek.com",
+    protocol: "openai",
+    enableWebSearch: false,
+    defaultModel: "deepseek-v4-flash-vision-exp",
+    defaultModelName: "DeepSeek V4 Flash Vision",
+    desc: "支持 JPEG/PNG/GIF/WebP 图像理解与截图分析",
+  },
+  {
+    label: "Anthropic Claude (官方 API)",
+    name: "Anthropic Claude",
+    baseUrl: "https://api.anthropic.com/v1",
+    protocol: "anthropic",
+    enableWebSearch: false,
+    defaultModel: "claude-3-5-sonnet-20241022",
+    defaultModelName: "Claude 3.5 Sonnet",
+    desc: "Anthropic 官方 Messages API 原生支持与多模态图文输入",
+  },
+  {
+    label: "OpenAI (Responses API + 联网)",
+    name: "OpenAI Responses",
+    baseUrl: "https://api.openai.com/v1",
+    protocol: "responses",
+    enableWebSearch: true,
+    defaultModel: "gpt-4o",
+    defaultModelName: "GPT-4o (Responses API + 联网)",
+    desc: "官方 Responses API 端点，支持 web_search_preview 与 URL 来源引用",
+  },
+  {
+    label: "OpenAI (Chat Completions)",
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    protocol: "openai",
+    enableWebSearch: false,
+    defaultModel: "gpt-4o",
+    defaultModelName: "GPT-4o",
+    desc: "经典 OpenAI /chat/completions 兼容端点",
+  },
+  {
+    label: "Ollama (本地模型)",
+    name: "Ollama Local",
+    baseUrl: "http://localhost:11434/v1",
+    protocol: "openai",
+    enableWebSearch: false,
+    defaultModel: "llama3.2-vision",
+    defaultModelName: "Llama 3.2 Vision",
+    desc: "本地离线大模型与多模态视觉推理",
+  },
+];
+
+const EMPTY_PROVIDER_FORM = {
+  name: "",
+  baseUrl: "",
+  apiKey: "",
+  protocol: "openai" as "openai" | "anthropic" | "responses",
+  enableWebSearch: false,
+  testModel: "",
+};
 const EMPTY_MODEL_FORM = { id: "", name: "" };
 
 /* ============================================================
@@ -147,9 +238,21 @@ function ProvidersSection() {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modelForm, setModelForm] = useState(EMPTY_MODEL_FORM);
+  const [showDocs, setShowDocs] = useState(false);
 
   const updateForm = (patch: Partial<typeof EMPTY_PROVIDER_FORM>) => { setForm((current) => ({ ...current, ...patch })); setTestState(null); };
   const formReady = Boolean(form.name.trim() && form.baseUrl.trim() && form.apiKey.trim());
+
+  function applyPreset(preset: ProviderPreset) {
+    updateForm({
+      name: preset.name,
+      baseUrl: preset.baseUrl,
+      protocol: preset.protocol,
+      enableWebSearch: preset.enableWebSearch,
+      testModel: preset.defaultModel,
+    });
+    setNotice({ ok: true, text: `已套用「${preset.label}」预设配置，请填写你的 API Key 并测试连接。` });
+  }
 
   async function testConnection() {
     if (!formReady || testing) return;
@@ -159,7 +262,15 @@ function ProvidersSection() {
     }
     setTesting(true); setTestState(null);
     try {
-      const result = await api.testModelConnection({ name: form.name.trim(), model: form.testModel.trim(), base_url: form.baseUrl.trim(), api_key: form.apiKey.trim(), type: "chat" });
+      const result = await api.testModelConnection({
+        name: form.name.trim(),
+        model: form.testModel.trim(),
+        base_url: form.baseUrl.trim(),
+        api_key: form.apiKey.trim(),
+        protocol: form.protocol,
+        enable_web_search: form.enableWebSearch,
+        type: "chat",
+      });
       setTestState({ ok: result.ok, message: result.message, detail: result.detail });
     } catch (error: any) {
       setTestState({ ok: false, message: error.message, detail: error.stack || error.message });
@@ -170,16 +281,19 @@ function ProvidersSection() {
 
   function saveProvider() {
     if (!formReady) return;
+    const defaultModels = form.testModel.trim() ? [{ id: form.testModel.trim(), name: form.testModel.trim() }] : [];
     const provider: ModelProvider = {
       id: `provider-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: form.name.trim(),
       baseUrl: form.baseUrl.trim(),
       apiKey: form.apiKey.trim(),
-      models: [],
+      protocol: form.protocol,
+      enableWebSearch: form.enableWebSearch,
+      models: defaultModels,
     };
     addProvider(provider);
     setExpandedId(provider.id);
-    setNotice({ ok: true, text: `已保存提供商「${provider.name}」，请在其下方添加模型。` });
+    setNotice({ ok: true, text: `已保存提供商「${provider.name}」${defaultModels.length ? "（已自动加入测试模型）" : "，请在其下方添加模型"}。` });
     setForm(EMPTY_PROVIDER_FORM);
     setTestState(null);
   }
@@ -223,9 +337,17 @@ function ProvidersSection() {
                 >
                   <ChevronDown size={15} className={cn("shrink-0 text-island-muted transition-transform", expanded && "rotate-180")} />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 flex-wrap">
                       <span className="truncate text-sm font-extrabold text-island-ink">{provider.name}</span>
                       {inUse && <span className="rounded-full bg-island-accentSoft px-2 py-px text-[11px] font-bold text-island-accentDeep">使用中</span>}
+                      <span className="rounded-full bg-island-panel px-2 py-px text-[10px] font-bold text-island-inkSoft uppercase">
+                        {provider.protocol === "anthropic" ? "Anthropic" : provider.protocol === "responses" ? "Responses API" : "OpenAI"}
+                      </span>
+                      {provider.enableWebSearch && (
+                        <span className="rounded-full bg-island-accentSoft/60 px-2 py-px text-[10px] font-bold text-island-accentDeep flex items-center gap-1">
+                          <Globe size={10} /> 联网
+                        </span>
+                      )}
                       <span
                         className={cn("h-2 w-2 shrink-0 rounded-full", provider.apiKey ? "bg-island-success" : "bg-island-faint")}
                         title={provider.apiKey ? "API Key 已配置" : "未配置 API Key"}
@@ -283,8 +405,64 @@ function ProvidersSection() {
       </div>
 
       <div className="mt-2 flex flex-col gap-3 border-t border-island-border pt-4">
-        <h3 className="text-sm font-extrabold text-island-ink">添加提供商</h3>
-        <p className="-mt-1 text-xs leading-5 text-island-muted">支持 OpenAI 兼容接口（如 DeepSeek、OpenAI、本地 Ollama 等）；「测试用模型 ID」仅用于测试连接，无需与后续添加的模型一致。</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-extrabold text-island-ink">添加提供商</h3>
+            <p className="mt-0.5 text-xs leading-5 text-island-muted">支持 OpenAI 兼容端点、Anthropic 原生 Messages API 与 OpenAI Responses API 规范。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDocs(!showDocs)}
+            className="flex items-center gap-1 rounded-full bg-island-panel px-2.5 py-1 text-xs font-bold text-island-accentDeep hover:bg-island-accentSoft transition-colors"
+          >
+            <BookOpen size={13} /> {showDocs ? "收起配置文档" : "查看 API 与联网查询文档"}
+          </button>
+        </div>
+
+        {/* 快捷预设 */}
+        <div className="flex flex-col gap-1.5 rounded-[14px] bg-island-panel/50 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-island-inkSoft">
+            <Sparkles size={13} className="text-island-accentDeep" /> 快速填入预设模板：
+          </div>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {PROVIDER_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => applyPreset(p)}
+                className="rounded-[10px] border border-island-borderStrong/30 bg-island-card px-2.5 py-1 text-xs font-bold text-island-ink transition-colors hover:border-island-accent hover:bg-island-accentSoft/30"
+                title={p.desc}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 文档说明卡片 */}
+        {showDocs && (
+          <div className="flex flex-col gap-2 rounded-[14px] border border-island-accent/40 bg-island-accentSoft/20 p-3.5 text-xs leading-5 text-island-ink">
+            <div className="flex items-center gap-1.5 font-extrabold text-island-accentDeep">
+              <HelpCircle size={14} /> API 协议与联网查询配置文档
+            </div>
+            <div className="space-y-2 text-[11px] leading-4 text-island-ink/90">
+              <div>
+                <strong>1. Anthropic API（Messages API）</strong>
+                <p className="text-island-muted">端点 Base URL 填写 <code className="rounded bg-island-card px-1 py-0.5 font-mono">https://api.anthropic.com/v1</code> 或 DeepSeek 的 <code className="rounded bg-island-card px-1 py-0.5 font-mono">https://api.deepseek.com/anthropic</code>。系统会自动适配 <code className="font-mono">x-api-key</code> 与 <code className="font-mono">anthropic-version: 2023-06-01</code> 鉴权，支持原生多模态图文输入。</p>
+              </div>
+              <div>
+                <strong>2. Responses API 与原生网络查询</strong>
+                <p className="text-island-muted">端点 Base URL 填写 <code className="rounded bg-island-card px-1 py-0.5 font-mono">https://api.openai.com/v1</code> 或 DeepSeek <code className="rounded bg-island-card px-1 py-0.5 font-mono">https://api.deepseek.com</code>。开启「联网查询」后，模型将自动调用服务端 <code className="font-mono">web_search</code> 工具进行深度检索，并将返回的权威文献和网页文档链接格式化显示在回答末尾。</p>
+              </div>
+              <div>
+                <strong>3. 视觉与多模态图像对齐</strong>
+                <p className="text-island-muted">支持 <strong>JPEG、PNG、GIF、WebP</strong> 格式。无论选择哪种协议，上传的图片都会自动转换为对应 API 规范（OpenAI <code className="font-mono">image_url</code>、Anthropic <code className="font-mono">source.base64</code>、Responses <code className="font-mono">input_image</code>）。</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 表单字段 */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-island-muted">提供商名称</label>
@@ -301,6 +479,49 @@ function ProvidersSection() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-island-muted">测试用模型 ID（可选）</label>
             <Input value={form.testModel} onChange={(e) => updateForm({ testModel: e.target.value })} placeholder="如 deepseek-chat" />
+          </div>
+        </div>
+
+        {/* 协议与联网设置 */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-island-muted">API 协议格式</label>
+            <div className="flex gap-1.5">
+              {([
+                ["openai", "OpenAI 兼容"],
+                ["anthropic", "Anthropic API"],
+                ["responses", "Responses API"],
+              ] as const).map(([val, lbl]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => updateForm({ protocol: val })}
+                  className={cn(
+                    "flex-1 rounded-[10px] border px-2 py-1.5 text-xs font-bold transition-colors",
+                    form.protocol === val ? "border-island-accent bg-island-accentSoft text-island-accentDeep" : "border-island-border bg-island-card text-island-muted hover:text-island-ink"
+                  )}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-end gap-1.5">
+            <label className="flex cursor-pointer items-center gap-2 rounded-[12px] border border-island-border bg-island-card px-3 py-2 hover:bg-island-panel/60">
+              <input
+                type="checkbox"
+                checked={form.enableWebSearch}
+                onChange={(e) => updateForm({ enableWebSearch: e.target.checked })}
+                className="accent-[var(--island-accent)]"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-1 text-xs font-bold text-island-ink">
+                  <Globe size={13} className="text-island-accentDeep" /> 开启联网查询 (Web Search)
+                </span>
+                <span className="block text-[10px] text-island-muted">查询网络并附带参考网页/文档链接</span>
+              </span>
+            </label>
           </div>
         </div>
         {testState && (
