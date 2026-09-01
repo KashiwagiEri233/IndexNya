@@ -1,0 +1,46 @@
+{
+  "name": "indexnya",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Index 学习岛：单进程 TypeScript 全栈学习工具",
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types src/runtime/dev.ts",
+    "build": "tsc -b && vite build && node scripts/build-server.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "start": "node dist-server/index.js",
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json --noEmit",
+    "test": "node --experimental-strip-types --test src/runtime/tests/*.test.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.51.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "katex": "^0.16.11",
+    "lucide-react": "^0.408.0",
+    "mermaid": "^10.9.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-force-graph-3d": "^1.29.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.24.1",
+    "rehype-katex": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
+    "tailwind-merge": "^2.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}
