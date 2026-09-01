@@ -1,8 +1,8 @@
 import type { ModelConfig } from "./types.ts";
 import { chatCompleteText, hasUsableModel } from "./llm.ts";
 
-export const IMAGE_MAX_SIZE = 4 * 1024 * 1024;
-export const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+export const IMAGE_MAX_SIZE = 10 * 1024 * 1024;
+export const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
 
 const SYSTEM_PROMPT = `你是一位图片理解辅导智能体。学生会上传题目、图表、代码截图或教学插图并提出问题。
 先简要描述图片关键信息，再针对问题给出结构化中文解答；信息不足时明确说明。`;

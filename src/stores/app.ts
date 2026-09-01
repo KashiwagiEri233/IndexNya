@@ -60,6 +60,8 @@ export function requestModelOf(entry: SelectedModelEntry | undefined) {
     model: entry.model.id,
     base_url: entry.provider.baseUrl,
     api_key: entry.provider.apiKey,
+    protocol: entry.provider.protocol || "openai",
+    enable_web_search: Boolean(entry.provider.enableWebSearch),
   };
   // 推理强度随请求透传（off 时不传，由接口默认）
   const effort = useAppStore.getState().reasoningEffort;

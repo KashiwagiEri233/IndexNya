@@ -24,10 +24,14 @@ export interface ModelProvider {
   id: string;
   /** 提供商显示名 */
   name: string;
-  /** OpenAI 兼容端点 */
+  /** API 端点 Base URL */
   baseUrl: string;
   /** API Key */
   apiKey: string;
+  /** API 协议类型：openai (默认) / anthropic / responses */
+  protocol?: "openai" | "anthropic" | "responses";
+  /** 是否开启网络查询 / 联网搜索 */
+  enableWebSearch?: boolean;
   /** 该提供商下的可选模型列表 */
   models: ProviderModel[];
 }
@@ -100,7 +104,17 @@ export interface CardRow {
   created_at: string;
 }
 
-export type ModelPayload = { id?: string; name?: string; model: string; base_url?: string; api_key?: string; type?: string; reasoning_effort?: string };
+export type ModelPayload = {
+  id?: string;
+  name?: string;
+  model: string;
+  base_url?: string;
+  api_key?: string;
+  type?: string;
+  reasoning_effort?: string;
+  protocol?: "openai" | "anthropic" | "responses";
+  enable_web_search?: boolean;
+};
 
 export interface ExploreCardPayload {
   term: string;
