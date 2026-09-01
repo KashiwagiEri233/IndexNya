@@ -7,6 +7,10 @@ import { useAppStore } from "./stores/app";
 import { applyTheme } from "./lib/theme";
 import "./styles/globals.css";
 
+if (typeof window !== "undefined" && window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin") {
+  document.documentElement.classList.add("is-mac-desktop");
+}
+
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });

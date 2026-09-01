@@ -18,6 +18,7 @@ export function ExploreDock() {
   const exploreFocus = useAppStore((s) => s.exploreFocus);
   const focusCardKey = useAppStore((s) => s.focusCardKey);
   const [treeOpen, setTreeOpen] = useState(false);
+  const isMacDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin");
 
   if (cards.length === 0) return null;
 
@@ -77,7 +78,7 @@ export function ExploreDock() {
 
   return (
     <>
-      <div className="explore-card-in fixed right-5 top-3 z-[95] flex items-center gap-2 rounded-full border border-island-border bg-island-card/90 px-3 py-1.5 text-xs font-bold text-island-muted shadow-island backdrop-blur">
+      <div className={cn("explore-card-in fixed right-5 z-[95] flex items-center gap-2 rounded-full border border-island-border bg-island-card/90 px-3 py-1.5 text-xs font-bold text-island-muted shadow-island backdrop-blur", isMacDesktop ? "top-5" : "top-3")}>
         <PanelsTopLeft size={13} className="text-island-accentDeep" />
         <span>{cards.length} 张探索卡片</span>
         <button
@@ -104,7 +105,7 @@ export function ExploreDock() {
 
       {/* 卡片树面板 — 仓库目录树风格 */}
       {treeOpen && (
-        <div className="explore-card-in fixed left-4 top-[4.5rem] z-[120] flex max-h-[70vh] w-[19rem] flex-col overflow-hidden rounded-[1.25rem] border border-island-border bg-island-content/95 shadow-island backdrop-blur">
+        <div className={cn("explore-card-in fixed left-4 z-[120] flex max-h-[70vh] w-[19rem] flex-col overflow-hidden rounded-[1.25rem] border border-island-border bg-island-content/95 shadow-island backdrop-blur", isMacDesktop ? "top-[5.25rem]" : "top-[4.5rem]")}>
           <div className="flex items-center justify-between border-b border-island-border bg-island-card/80 px-3 py-2">
             <div className="flex items-center gap-1.5 text-xs font-extrabold text-island-ink">
               <ListTree size={13} className="text-island-lavender" />

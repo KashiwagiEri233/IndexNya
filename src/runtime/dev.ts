@@ -1,4 +1,5 @@
 import path from "node:path";
+import net from "node:net";
 import { pathToFileURL } from "node:url";
 import { createRuntimeServer } from "./runtime.ts";
 import { projectRoot } from "./db.ts";
@@ -19,7 +20,24 @@ try {
   console.warn(`Vite 中间件加载失败，将只启动 API：${error instanceof Error ? error.message : String(error)}`);
 }
 
-const port = Number(process.env.PORT || 5173);
+async function findAvailablePort(startPort: number, host: string): Promise<number> {
+  for (let p = startPort; p < startPort + 50; p++) {
+    const isFree = await new Promise<boolean>((resolve) => {
+      const tester = net.createServer()
+        .once("error", () => resolve(false))
+        .once("listening", () => {
+          tester.close(() => resolve(true));
+        })
+        .listen(p, host);
+    });
+    if (isFree) return p;
+  }
+  return startPort;
+}
+
+const requestedPort = Number(process.env.PORT || 5173);
 const host = process.env.HOST || "127.0.0.1";
+const port = process.env.STRICT_PORT ? requestedPort : await findAvailablePort(requestedPort, host);
+
 await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(port, host, resolve); });
 console.log(`Index 学习岛 TS 全栈开发服务已启动：http://${host}:${port}`);

@@ -16,8 +16,22 @@ interface Verdict {
   missing: string[];
 }
 
-// NookPhone 粉彩色板
-const PALETTE = ["#82d5bb", "#f8a6b2", "#889df0", "#f7cd67", "#e59266", "#b77dee", "#8ac68a"];
+// animal-island-ui 官方 13 色 NookPhone 标准调色盘
+const PALETTE = [
+  "#19c8b9", // 薄荷青绿
+  "#82d5bb", // 应用青
+  "#8ac68a", // 应用绿
+  "#d1da49", // 青柠绿
+  "#ecdf52", // 黄绿
+  "#f7cd67", // 应用黄
+  "#e59266", // 应用橙
+  "#e18c6f", // 暖桃粉
+  "#fc736d", // 应用红
+  "#f8a6b2", // 应用粉
+  "#b77dee", // 紫色
+  "#889df0", // 应用蓝
+  "#9a835a", // 棕色
+];
 
 export default function UniversePage() {
   const universeVersion = useAppStore((s) => s.universeVersion);

@@ -107,6 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const themeMode = useAppStore((s) => s.themeMode);
   const accentColor = useAppStore((s) => s.accentColor);
   const navigate = useNavigate();
+  const isMacDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin");
 
   // 主题：store 变化时重放（main.tsx 已在渲染前应用过一次，这里负责后续同步）
   useEffect(() => {
@@ -226,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-island-bg">
       <aside className="relative flex w-[17rem] shrink-0 flex-col overflow-hidden border-r border-island-border bg-island-panel/60">
-        <div className="relative px-5 pb-5 pt-6">
+        <div className={cn("relative px-5 pb-4 select-none window-drag", isMacDesktop ? "pt-14" : "pt-6")}>
           <div className="flex items-center gap-3">
             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-island-accent text-white shadow-btn-3d-teal">
               <BookOpen size={21} strokeWidth={2.4} />

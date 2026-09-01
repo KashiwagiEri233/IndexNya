@@ -65,10 +65,11 @@ export function ExploreCard({
   const meta = MODE_META[card.mode];
   const isPending = card.status === "pending";
   const focused = focusCardKey === card.key;
+  const isMacDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin");
 
   /** 卡片锚定：right = R + x，top = T + y（与探索卡片坞的级联偏移一致） */
   const R = 16 + depth * 24;
-  const T = 84 + depth * 26;
+  const T = (isMacDesktop ? 96 : 84) + depth * 26;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

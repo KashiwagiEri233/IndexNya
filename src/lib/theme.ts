@@ -132,6 +132,11 @@ function toVarString(c: RGB): string {
   return `${c.r} ${c.g} ${c.b}`;
 }
 
+function toHex(c: RGB): string {
+  const to2 = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${to2(c.r)}${to2(c.g)}${to2(c.b)}`;
+}
+
 let systemListener: ((e: MediaQueryListEvent) => void) | null = null;
 
 /** 应用主题：切换 .dark 类 + 覆写主色变量。返回主色是否合法并被写入。 */
@@ -177,6 +182,21 @@ export function applyTheme(themeMode: ThemeMode, accentHex: string): boolean {
   (Object.keys(NEUTRAL_TINT) as NeutralVar[]).forEach((name) => {
     set(name, mix(base[name], rgb, NEUTRAL_TINT[name]));
   });
+
+  // 同步桌面端（Electron）窗口顶部栏与背景色
+  const bgMixed = mix(base["--island-bg"], rgb, NEUTRAL_TINT["--island-bg"]);
+  const inkMixed = mix(base["--island-ink"], rgb, NEUTRAL_TINT["--island-ink"]);
+  const bgHex = toHex(bgMixed);
+  const symbolHex = toHex(inkMixed);
+
+  if (typeof window !== "undefined" && window.electronAPI?.updateTheme) {
+    window.electronAPI.updateTheme({
+      mode: isDark ? "dark" : "light",
+      backgroundColor: bgHex,
+      symbolColor: symbolHex,
+      accentColor: accentHex,
+    }).catch(() => {});
+  }
 
   return true;
 }

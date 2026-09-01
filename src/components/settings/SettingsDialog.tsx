@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronDown, Database, Download, FileJson, Monitor, Moon, NotebookPen, Palette, PlugZap, RotateCcw, Settings2, SlidersHorizontal, Sun, Trash2, Upload, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { RibbonTitle } from "@/components/ui/ribbon";
 import { Input } from "@/components/ui/input";
 import { api, type Conversation, type ModelProvider, type Skill } from "@/lib/api";
 import { useAppStore, modelKeyOf, requestModelOf, resolveSelectedModel, type ThemeMode } from "@/stores/app";
@@ -10,18 +12,27 @@ import { normalizeHex } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_ACCENT = "#19c8b9";
-/** 预设色卡：零依赖的原生取色器之外，常用色一键选择 */
-const PRESET_ACCENTS = [
-  "#19c8b9", // 薄荷青绿（默认）
-  "#22b8cf", // 海蓝
-  "#4d7cf6", // 天蓝
-  "#8b5cf6", // 紫罗兰
-  "#ec4899", // 粉红
-  "#f97316", // 暖橙
-  "#eab308", // 暖黄
-  "#22c55e", // 草绿
-  "#a855f7", // 葡萄紫
-  "#64748b", // 雾灰蓝
+export interface AccentPreset {
+  hex: string;
+  name: string;
+  enName: string;
+}
+
+/** animal-island-ui 官方 13 色 NookPhone 强调色调色盘 */
+const PRESET_ACCENTS: AccentPreset[] = [
+  { hex: "#19c8b9", name: "薄荷青绿", enName: "Mint Teal (默认)" },
+  { hex: "#82d5bb", name: "应用青", enName: "App Teal" },
+  { hex: "#8ac68a", name: "应用绿", enName: "App Green" },
+  { hex: "#d1da49", name: "青柠绿", enName: "Lime Green" },
+  { hex: "#ecdf52", name: "黄绿色", enName: "Yellow Green" },
+  { hex: "#f7cd67", name: "应用黄", enName: "App Yellow" },
+  { hex: "#e59266", name: "应用橙", enName: "App Orange" },
+  { hex: "#e18c6f", name: "暖桃粉", enName: "Warm Peach Pink" },
+  { hex: "#fc736d", name: "应用红", enName: "App Red" },
+  { hex: "#f8a6b2", name: "应用粉", enName: "App Pink" },
+  { hex: "#b77dee", name: "紫色", enName: "Purple" },
+  { hex: "#889df0", name: "应用蓝", enName: "App Blue" },
+  { hex: "#9a835a", name: "棕色", enName: "Brown" },
 ];
 
 const THEME_MODES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
@@ -476,22 +487,25 @@ function AppearanceSection() {
 
       {/* 主色：预设色卡 */}
       <div className="mt-1 flex flex-col gap-2.5">
-        <h3 className="text-sm font-extrabold text-island-ink flex items-center gap-1.5"><Palette size={14} className="text-island-accentDeep" /> 主界面颜色（强调色）</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold text-island-ink flex items-center gap-1.5"><Palette size={14} className="text-island-accentDeep" /> 主界面颜色（13 款 NookPhone 强调色）</h3>
+          <span className="text-[11px] font-bold text-island-muted">点击即换色</span>
+        </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          {PRESET_ACCENTS.map((hex) => {
-            const active = accentColor.toLowerCase() === hex;
+          {PRESET_ACCENTS.map((preset) => {
+            const active = accentColor.toLowerCase() === preset.hex.toLowerCase();
             return (
               <button
-                key={hex}
+                key={preset.hex}
                 type="button"
-                onClick={() => setAccentColor(hex)}
-                title={hex}
-                aria-label={`选择颜色 ${hex}`}
+                onClick={() => setAccentColor(preset.hex)}
+                title={`${preset.name} · ${preset.enName} (${preset.hex})`}
+                aria-label={`选择颜色 ${preset.name} ${preset.hex}`}
                 className={cn(
-                  "relative h-8 w-8 rounded-full transition-transform duration-150 ease-island hover:scale-110",
+                  "relative h-8 w-8 rounded-full transition-transform duration-150 ease-island hover:scale-110 shadow-soft",
                   active && "ring-2 ring-island-ink/70 ring-offset-2 ring-offset-island-card"
                 )}
-                style={{ backgroundColor: hex }}
+                style={{ backgroundColor: preset.hex }}
               >
                 {active && (
                   <Check size={15} className="absolute inset-0 m-auto text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" strokeWidth={3.5} />
@@ -502,7 +516,7 @@ function AppearanceSection() {
           {/* 原生取色器：零依赖 */}
           <label
             className="relative flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-island-borderStrong/60 text-island-muted transition-colors hover:border-island-accent hover:text-island-accentDeep"
-            title="打开取色器"
+            title="打开取色器（自定义任意色号）"
           >
             <Palette size={15} />
             <input
@@ -516,7 +530,7 @@ function AppearanceSection() {
             />
           </label>
         </div>
-        <p className="text-xs leading-5 text-island-muted">预设色卡 + 右上角取色器，任选其一；选择后立即全局生效并自动保存。</p>
+        <p className="text-xs leading-5 text-island-muted">支持取色器与自定义色号。</p>
       </div>
 
       {/* 主色：16 进制输入 */}
@@ -560,13 +574,32 @@ function AppearanceSection() {
       </div>
 
       {/* 当前色预览 */}
-      <div className="mt-1 flex items-center gap-3 rounded-[16px] border-2 border-dashed border-island-borderStrong/40 px-4 py-3">
-        <span className="h-9 w-9 shrink-0 rounded-full shadow-inner" style={{ backgroundColor: accentColor }} />
-        <div className="min-w-0">
-          <div className="text-sm font-extrabold text-island-ink">当前主色 <span className="ml-1 font-mono text-[13px] font-bold text-island-accentDeep">{accentColor.toUpperCase()}</span></div>
-          <div className="truncate text-xs text-island-muted">深色模式下会自动调和出更亮的悬停 / 强调变体，保证可读性。</div>
-        </div>
-      </div>
+      {(() => {
+        const matchedPreset = PRESET_ACCENTS.find((p) => p.hex.toLowerCase() === accentColor.toLowerCase());
+        return (
+          <div className="mt-2 flex flex-col gap-3 rounded-[20px] border-2 border-island-border bg-island-card p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-3 border-b border-island-border/80 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="h-10 w-10 shrink-0 rounded-full shadow-inner ring-2 ring-island-borderStrong/30" style={{ backgroundColor: accentColor }} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-island-ink">{matchedPreset ? matchedPreset.name : "自定义主色"}</span>
+                    <span className="font-mono text-xs font-bold text-island-accentDeep">{accentColor.toUpperCase()}</span>
+                  </div>
+                  <div className="truncate text-xs text-island-muted">{matchedPreset ? matchedPreset.enName : "深色模式下会自动计算可读变体"}</div>
+                </div>
+              </div>
+              <Badge variant="accent">全局联动中</Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 pt-0.5">
+              <RibbonTitle color="teal" className="text-xs">飘带标题</RibbonTitle>
+              <Button variant="accent" size="sm">3D 强调按钮</Button>
+              <Button variant="default" size="sm">柔和按钮</Button>
+              <Badge variant="accent">标签徽章</Badge>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
