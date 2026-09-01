@@ -17,6 +17,8 @@ dist/
 # TypeScript full-stack runtime
 data/
 dist-server/
+dist-electron/
+release/
 src/runtime/skills/*.json
 *.db-wal
 *.db-shm

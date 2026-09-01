@@ -18,10 +18,29 @@ interface SkillSettings {
   removed?: string[];
 }
 
-const root = projectRoot();
-const seedRoot = path.join(root, "src", "runtime", "skills");
-const dataRoot = path.join(root, "data", "skills");
-const settingsPath = path.join(root, "data", "skills.json");
+export function getSkillsDataRoot(): string {
+  const configuredDataDir = process.env.INDEXNYA_DATA_DIR?.trim();
+  if (configuredDataDir) return path.join(path.resolve(configuredDataDir), "skills");
+  return path.join(projectRoot(), "data", "skills");
+}
+
+export function getSkillsSettingsPath(): string {
+  const configuredDataDir = process.env.INDEXNYA_DATA_DIR?.trim();
+  if (configuredDataDir) return path.join(path.resolve(configuredDataDir), "skills.json");
+  return path.join(projectRoot(), "data", "skills.json");
+}
+
+export function getSkillsSeedRoot(): string {
+  const configuredSeed = process.env.INDEXNYA_SKILLS_SEED_DIR?.trim();
+  if (configuredSeed) return path.resolve(configuredSeed);
+  const root = projectRoot();
+  const candidates = [
+    path.join(root, "src", "runtime", "skills"),
+    path.join(root, "skills"),
+    path.join(root, "data", "skills"),
+  ];
+  return candidates.find((c) => fs.existsSync(c)) || candidates[0];
+}
 
 function safeName(value: string): string {
   const name = value.trim().replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
@@ -30,6 +49,7 @@ function safeName(value: string): string {
 }
 
 function readSettings(): SkillSettings {
+  const settingsPath = getSkillsSettingsPath();
   try {
     const parsed = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as SkillSettings;
     return parsed && typeof parsed === "object" ? parsed : {};
@@ -39,6 +59,7 @@ function readSettings(): SkillSettings {
 }
 
 function writeSettings(settings: SkillSettings): void {
+  const settingsPath = getSkillsSettingsPath();
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify({ enabled: settings.enabled || {}, removed: settings.removed || [] }, null, 2), "utf8");
 }
@@ -76,6 +97,8 @@ function listDirectories(dir: string): string[] {
 }
 
 function ensureInitialized(): void {
+  const dataRoot = getSkillsDataRoot();
+  const seedRoot = getSkillsSeedRoot();
   fs.mkdirSync(dataRoot, { recursive: true });
   // Built-in skills are copied into the writable data directory once. This
   // keeps runtime install/uninstall state out of the source tree and works in
@@ -92,6 +115,7 @@ function ensureInitialized(): void {
 
 function readSkill(name: string): Skill | undefined {
   ensureInitialized();
+  const dataRoot = getSkillsDataRoot();
   const safe = safeName(name);
   const file = path.join(dataRoot, safe, "SKILL.md");
   if (!fs.existsSync(file)) return undefined;
@@ -104,6 +128,7 @@ function readSkill(name: string): Skill | undefined {
 
 export function listSkills(): Skill[] {
   ensureInitialized();
+  const dataRoot = getSkillsDataRoot();
   const settings = readSettings();
   const removed = new Set(settings.removed || []);
   const names = listDirectories(dataRoot);
@@ -129,6 +154,7 @@ export function setSkillEnabled(name: string, enabled: boolean): boolean {
 
 export function deleteSkill(name: string): boolean {
   ensureInitialized();
+  const dataRoot = getSkillsDataRoot();
   const safe = safeName(name);
   const skill = readSkill(safe);
   if (!skill) return false;
@@ -189,9 +215,9 @@ function decodeZipEntry(entry: ZipEntry): Buffer {
 }
 
 function validateZipPath(name: string): string[] {
-  const normalized = name.replaceAll("\\", "/");
-  const parts = normalized.split("/").filter(Boolean);
-  if (!parts.length || parts.includes("..") || parts.some((part) => part.includes("\0")) || normalized.startsWith("/")) {
+  const normalized = name.replace(/\\/g, "/");
+  const parts: string[] = normalized.split("/").filter(Boolean);
+  if (!parts.length || parts.includes("..") || parts.some((part: string) => part.includes("\0")) || normalized.startsWith("/")) {
     throw new HttpError(400, "技能包包含不安全的文件路径");
   }
   return parts;
@@ -199,6 +225,7 @@ function validateZipPath(name: string): string[] {
 
 export async function installSkillFromZip(buffer: Buffer, filename: string): Promise<string[]> {
   ensureInitialized();
+  const dataRoot = getSkillsDataRoot();
   const entries = readZipEntries(buffer);
   const skillFiles = entries.filter((entry) => validateZipPath(entry.name).at(-1)?.toLowerCase() === "skill.md");
   if (!skillFiles.length) throw new HttpError(400, "技能包中没有找到 SKILL.md");

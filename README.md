@@ -52,6 +52,27 @@ npm run dev
 
 打开 <http://localhost:5173>。页面与 API 共用同源地址，API 入口为 `/api`，不再有单独的 `localhost:8000` 服务。
 
+### 桌面端运行与打包（Electron）
+
+本项目已原生集成 Electron 桌面端环境，支持一键桌面调试与跨平台安装包构建：
+
+```bash
+# 1. 一键启动桌面端开发调试（自动编译主进程并联动 Vite HMR）
+npm run dev:desktop
+# 或使用启动脚本：
+./start.sh --desktop         # macOS / Linux
+.\start.ps1 -Desktop         # Windows PowerShell
+
+# 2. 桌面端生产构建
+npm run build:desktop        # 编译前端、全栈服务及 Electron 主进程/Preload 脚本
+npm run start:desktop        # 本地直接启动构建好的桌面应用
+
+# 3. 跨平台打包桌面安装包（macOS dmg/zip、Windows NSIS/Portable、Linux AppImage/deb）
+npm run dist:desktop
+```
+
+> **桌面端数据隔离**：打包为独立桌面应用后，SQLite 数据库与技能配置将自动存放于系统标准用户数据目录（`app.getPath('userData')`），避免安装目录只读权限问题；开发调试时仍沿用项目本地 `./data/`。
+
 ### 构建与生产运行
 
 ```bash
