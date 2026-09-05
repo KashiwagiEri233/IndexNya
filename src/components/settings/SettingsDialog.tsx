@@ -163,12 +163,25 @@ export function SettingsDialog() {
   ];
   const active = NAV.find((n) => n.id === activeId)?.id ?? NAV[0].id;
 
+  // Windows 桌面端：设置弹窗从标题栏白条（38px）下方展开，
+  // 遮罩不覆盖白条与系统窗口控制按钮，关闭按钮也不会被系统按钮层拦截。
+  const isWinDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "win32");
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" role="presentation">
+    <div
+      className={cn(
+        "fixed z-[100] flex items-center justify-center",
+        isWinDesktop ? "inset-x-0 top-[38px] bottom-0" : "inset-0"
+      )}
+      role="presentation"
+    >
       {/* 遮罩：点击关闭 */}
       <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" aria-hidden="true" onClick={() => setOpen(false)} />
       <div
-        className="relative z-10 flex h-[min(720px,calc(100vh-48px))] w-[min(860px,calc(100vw-48px))] overflow-hidden rounded-bubble border border-island-border bg-island-card shadow-island-hover animate-float-in"
+        className={cn(
+          "relative z-10 flex w-[min(860px,calc(100vw-48px))] overflow-hidden rounded-bubble border border-island-border bg-island-card shadow-island-hover animate-float-in",
+          isWinDesktop ? "h-[min(720px,calc(100vh-62px))]" : "h-[min(720px,calc(100vh-48px))]"
+        )}
         role="dialog"
         aria-modal="true"
         aria-label="设置"

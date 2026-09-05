@@ -7,8 +7,13 @@ import { useAppStore } from "./stores/app";
 import { applyTheme } from "./lib/theme";
 import "./styles/globals.css";
 
-if (typeof window !== "undefined" && window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin") {
-  document.documentElement.classList.add("is-mac-desktop");
+if (typeof window !== "undefined" && window.electronAPI?.isElectron) {
+  const platform = window.electronAPI.platform;
+  if (platform === "darwin") {
+    document.documentElement.classList.add("is-mac-desktop");
+  } else if (platform === "win32") {
+    document.documentElement.classList.add("is-win-desktop");
+  }
 }
 
 const qc = new QueryClient({
