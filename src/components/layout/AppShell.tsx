@@ -108,6 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const accentColor = useAppStore((s) => s.accentColor);
   const navigate = useNavigate();
   const isMacDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin");
+  const isWinDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "win32");
 
   // 主题：store 变化时重放（main.tsx 已在渲染前应用过一次，这里负责后续同步）
   useEffect(() => {
@@ -225,7 +226,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-island-bg">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-island-bg">
+      {/* Windows 桌面端标题栏白条：与系统窗口控制按钮（titleBarOverlay 高度 38px）对齐，避免按钮遮挡界面 */}
+      {isWinDesktop && (
+        <div className="flex h-[38px] w-full shrink-0 select-none items-center border-b border-island-border/60 bg-island-bg">
+          <div className="window-drag flex h-full flex-1 items-center pl-4">
+            <span className="text-[13px] font-extrabold tracking-wide text-island-ink/80">IndexNya</span>
+          </div>
+          {/* 右侧 ~140px 预留给系统窗口控制按钮（关闭/最小化/最大化），不可拖拽 */}
+          <div className="window-no-drag h-full w-[140px] shrink-0" />
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1">
       <aside className="relative flex w-[17rem] shrink-0 flex-col overflow-hidden border-r border-island-border bg-island-panel/60">
         <div className={cn("relative px-5 pb-4 select-none window-drag", isMacDesktop ? "pt-14" : "pt-6")}>
           <div className="flex items-center gap-3">
@@ -358,6 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-hidden bg-island-bg">{children}</main>
+      </div>
       <SettingsDialog />
     </div>
   );

@@ -87,11 +87,27 @@ if (!ready) {
 }
 
 console.log("开发服务已就绪，正在启动 Electron 桌面窗口...");
-const electronBinary = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
+
+// Windows：优先直接 spawn electron.exe（真实可执行文件）；
+// 回退到 .bin/electron.cmd 时必须带 shell:true，否则 Node 会报 spawn EINVAL。
+let electronBinary;
+let electronSpawnOptions = { shell: false };
+if (process.platform === "win32") {
+  const electronExe = path.join(root, "node_modules", "electron", "dist", "electron.exe");
+  if (fs.existsSync(electronExe)) {
+    electronBinary = electronExe;
+  } else {
+    electronBinary = path.join(root, "node_modules", ".bin", "electron.cmd");
+    electronSpawnOptions = { shell: true };
+  }
+} else {
+  electronBinary = path.join(root, "node_modules", ".bin", "electron");
+}
 
 const electronProcess = spawn(electronBinary, ["dist-electron/main.cjs"], {
   cwd: root,
   stdio: "inherit",
+  ...electronSpawnOptions,
   env: {
     ...process.env,
     INDEXNYA_DEV_URL: devUrl,

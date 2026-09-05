@@ -19,6 +19,7 @@ export function ExploreDock() {
   const focusCardKey = useAppStore((s) => s.focusCardKey);
   const [treeOpen, setTreeOpen] = useState(false);
   const isMacDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "darwin");
+  const isWinDesktop = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron && window.electronAPI?.platform === "win32");
 
   if (cards.length === 0) return null;
 
@@ -78,7 +79,7 @@ export function ExploreDock() {
 
   return (
     <>
-      <div className={cn("explore-card-in fixed right-5 z-[95] flex items-center gap-2 rounded-full border border-island-border bg-island-card/90 px-3 py-1.5 text-xs font-bold text-island-muted shadow-island backdrop-blur", isMacDesktop ? "top-5" : "top-3")}>
+      <div className={cn("explore-card-in fixed right-5 z-[95] flex items-center gap-2 rounded-full border border-island-border bg-island-card/90 px-3 py-1.5 text-xs font-bold text-island-muted shadow-island backdrop-blur", isMacDesktop ? "top-5" : isWinDesktop ? "top-[2.75rem]" : "top-3")}>
         <PanelsTopLeft size={13} className="text-island-accentDeep" />
         <span>{cards.length} 张探索卡片</span>
         <button
