@@ -204,6 +204,13 @@ CREATE TABLE IF NOT EXISTS practice_records (
   FOREIGN KEY (student_id) REFERENCES students(id),
   FOREIGN KEY (conversation_id) REFERENCES conversations(id)
 );
+CREATE TABLE IF NOT EXISTS daily_problem_cache (
+  source TEXT NOT NULL,
+  date TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (source, date)
+);
 `;
 
 const MIGRATIONS: Array<[string, string, string]> = [

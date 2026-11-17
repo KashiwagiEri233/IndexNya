@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Database } from "../db.ts";
 import { handleApiRequest } from "../api.ts";
 import { chunkText } from "../literature.ts";
+import { beijingDate, parseNowcoderCollection, parseNowcoderDetail } from "../daily.ts";
 import { gradeAnswer, newSession, applyToolArgs, summaryText } from "../quiz.ts";
 import { cosine, localEmbed } from "../universe.ts";
 import {
@@ -47,6 +48,33 @@ test("literature chunking preserves overlap", () => {
   const chunks = chunkText("词".repeat(9000), 4000, 300);
   assert.equal(chunks.length, 3);
   assert.ok(chunks[1].startsWith("词".repeat(300)));
+});
+
+test("nowcoder daily parsers keep id, tags and description", () => {
+  const collectionHtml = `<table><tr data-problemId="23619">
+    <td><a href="/acm/problem/23619">NC23619</a></td>
+    <td class="fn-right" colspan="2"><a href="/acm/problem/23619" class="title">小A的柱状图</a>
+    <a href="javascript:void(0);" class="tag-label js-tag" data-id="1302">单调队列单调栈</a></td>
+    <td>1900</td><td>975</td></tr></table>`;
+  const pool = parseNowcoderCollection(collectionHtml);
+  assert.equal(pool.length, 1);
+  assert.equal(pool[0].id, "23619");
+  assert.equal(pool[0].title, "小A的柱状图");
+  assert.equal(pool[0].difficulty, "中等");
+  assert.deepEqual(pool[0].tags.map((tag) => tag.name), ["单调队列单调栈"]);
+
+  const detailHtml = `<div class="question-title"><i class="icon-list"></i>小A的柱状图</div>
+    <div class="terminal-topic"><div class="subject-question">题目正文</div><textarea>2</textarea></div>
+    <div class="js-right">editor</div>`;
+  const detail = parseNowcoderDetail(detailHtml, "23619");
+  assert.equal(detail.title, "小A的柱状图");
+  assert.match(detail.contentHtml, /题目正文/);
+  assert.doesNotMatch(detail.contentHtml, /textarea/);
+});
+
+test("beijing date follows Asia/Shanghai", () => {
+  assert.equal(beijingDate(new Date("2026-10-24T17:00:00Z")), "2026-10-25");
+  assert.equal(beijingDate(new Date("2026-10-24T08:00:00Z")), "2026-10-24");
 });
 
 test("API persists chat fallback, branches, and deletes a conversation tree", async () => {
