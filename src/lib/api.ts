@@ -86,6 +86,47 @@ export interface PracticeRecord {
 /** 探索卡片（层级对话） */
 export type ExploreMode = "child" | "related" | "branch";
 
+export type DailySource = "leetcode" | "nowcoder";
+export type DailyDifficulty = "简单" | "中等" | "困难" | "未知";
+
+export interface DailyTag {
+  name: string;
+  slug: string;
+}
+
+export interface DailyProblem {
+  source: DailySource;
+  id: string;
+  slug: string;
+  title: string;
+  subtitle?: string;
+  difficulty: DailyDifficulty;
+  tags: DailyTag[];
+  contentHtml: string;
+  url: string;
+  date: string;
+  fetchedAt: string;
+  codeSnippets?: { lang: string; langSlug: string; code: string }[];
+  stale?: boolean;
+  offline?: boolean;
+  note?: string;
+}
+
+export interface DailyProblemSummary {
+  source: DailySource;
+  id: string;
+  slug: string;
+  title: string;
+  difficulty: DailyDifficulty;
+  tags: DailyTag[];
+}
+
+export interface DailyRecommendations {
+  source: DailySource;
+  items: DailyProblemSummary[];
+  note?: string;
+}
+
 export interface CardRow {
   id: number;
   student_id: number;
@@ -233,6 +274,28 @@ export const api = {
     return j<{ deleted_count: number }>(
       await fetch(`${API_BASE}/practice`, { method: "DELETE" })
     );
+  },
+
+  // ===== 每日一题 =====
+  async getDailyProblem(params: { source: DailySource; id?: string; slug?: string; refresh?: boolean }) {
+    const query = new URLSearchParams({ source: params.source });
+    if (params.id) query.set("id", params.id);
+    if (params.slug) query.set("slug", params.slug);
+    if (params.refresh) query.set("refresh", "1");
+    return j<DailyProblem>(await fetch(`${API_BASE}/daily/problem?${query.toString()}`));
+  },
+
+  async getDailyRecommendations(params: {
+    source: DailySource;
+    tags: string[];
+    exclude?: string;
+    limit?: number;
+  }) {
+    const query = new URLSearchParams({ source: params.source });
+    if (params.tags.length) query.set("tags", params.tags.join(","));
+    if (params.exclude) query.set("exclude", params.exclude);
+    if (params.limit) query.set("limit", String(params.limit));
+    return j<DailyRecommendations>(await fetch(`${API_BASE}/daily/recommend?${query.toString()}`));
   },
 
   async generateResource(payload: {

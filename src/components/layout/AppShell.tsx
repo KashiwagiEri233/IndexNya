@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { BookOpen, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck } from "lucide-react";
+import { BookOpen, Sparkles, Plus, MessageSquare, Flower2, ChevronRight, GitBranch, Trash2, Settings, ScrollText, Orbit, ArrowUpRight, ArrowRight, ArrowDown, Layers, ClipboardCheck, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { SettingsDialog } from "@/components/settings/SettingsDialog";
 const NAV = [
   // NookPhone 粉彩应用砖配色（深色下自动换用 *Deep 可读色）
   { to: "/chat", label: "学习对话", icon: Sparkles, tile: "bg-island-seafoam/35 text-island-seafoamDeep" },
+  { to: "/daily", label: "每日一题", icon: CalendarDays, tile: "bg-island-orange/25 text-island-orangeDeep" },
   { to: "/practice", label: "错题本", icon: ClipboardCheck, tile: "bg-island-yellow/45 text-island-yellowDeep" },
   { to: "/literature", label: "文献阅读", icon: ScrollText, tile: "bg-island-sky/30 text-island-skyDeep" },
   { to: "/universe", label: "思维宇宙", icon: Orbit, tile: "bg-island-lavender/30 text-island-lavenderDeep" },

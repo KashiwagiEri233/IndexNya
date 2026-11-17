@@ -138,6 +138,10 @@ interface AppState {
   pendingPracticeMessage: { text: string } | null;
   setPendingPracticeMessage: (v: { text: string } | null) => void;
 
+  // 每日一题知识点划线：跨页传递到对话页并自动提问（不持久化）
+  pendingChatPrompt: { text: string } | null;
+  setPendingChatPrompt: (v: { text: string } | null) => void;
+
   // 探索卡片坞（层级对话）
   exploreCards: ExploreCardState[];
   exploreAdd: (card: ExploreCardState) => void;
@@ -224,6 +228,9 @@ export const useAppStore = create<AppState>()(
 
       pendingPracticeMessage: null,
       setPendingPracticeMessage: (v) => set({ pendingPracticeMessage: v }),
+
+      pendingChatPrompt: null,
+      setPendingChatPrompt: (v) => set({ pendingChatPrompt: v }),
 
       exploreCards: [],
       exploreAdd: (card) => set((state) => ({ exploreCards: [...state.exploreCards, card] })),

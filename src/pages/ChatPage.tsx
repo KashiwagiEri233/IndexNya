@@ -404,6 +404,18 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPracticeMessage]);
 
+  // 每日一题知识点划线：跳转后自动发送提问
+  const pendingChatPrompt = useAppStore((s) => s.pendingChatPrompt);
+  const setPendingChatPrompt = useAppStore((s) => s.setPendingChatPrompt);
+  useEffect(() => {
+    if (pendingChatPrompt) {
+      const text = pendingChatPrompt.text;
+      setPendingChatPrompt(null);
+      void send(text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatPrompt]);
+
   // 编辑 / 引用 / 删除状态
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");

@@ -35,6 +35,7 @@ import {
   updateResource,
 } from "./repository.ts";
 import { exportData, exportNotes, importData } from "./data.ts";
+import { getDailyProblem, recommendDailyProblems } from "./daily.ts";
 import type { ChatRequest, ExploreRequest, JsonObject, ModelConfig } from "./types.ts";
 
 export interface ApiRequest {
@@ -286,6 +287,27 @@ export async function handleApiRequest(request: ApiRequest, db: Database): Promi
     if (parts.length === 2 && parts[1] === "export-notes" && method === "POST") {
       const payload = parseJsonBody<{ conversation_ids?: number[]; format?: "both" | "notes" | "mindmap"; mode?: "direct" | "ai"; model?: ModelConfig }>(request);
       return ok(await exportNotes(db, (payload.conversation_ids || []).map(Number), payload.format || "both", payload.mode || "direct", modelFrom(payload.model)));
+    }
+  }
+
+  // Daily challenge -----------------------------------------------------------
+  if (parts[0] === "daily") {
+    if (parts.length === 2 && parts[1] === "problem" && method === "GET") {
+      return ok(await getDailyProblem(db, {
+        source: request.searchParams.get("source") || undefined,
+        id: request.searchParams.get("id") || undefined,
+        slug: request.searchParams.get("slug") || undefined,
+        refresh: request.searchParams.get("refresh") === "1",
+      }));
+    }
+    if (parts.length === 2 && parts[1] === "recommend" && method === "GET") {
+      const tags = (request.searchParams.get("tags") || "").split(",").map((tag) => tag.trim()).filter(Boolean);
+      return ok(await recommendDailyProblems({
+        source: request.searchParams.get("source") || undefined,
+        tags,
+        exclude: request.searchParams.get("exclude") || undefined,
+        limit: Number(request.searchParams.get("limit") || 5),
+      }));
     }
   }
 
